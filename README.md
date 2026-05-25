@@ -62,7 +62,7 @@ intelligent-teaching-platform
 
 * Node.js 18.x
 * npm 9.x
-* JDK 8/11
+* JDK 17
 
 ---
 
