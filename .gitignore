@@ -1,0 +1,11 @@
+# 前端依赖
+frontend/node_modules/
+
+# 后端编译产物
+backend/target/
+backend/.idea/
+backend/*.iml
+
+# 系统文件
+.DS_Store
+Thumbs.db
