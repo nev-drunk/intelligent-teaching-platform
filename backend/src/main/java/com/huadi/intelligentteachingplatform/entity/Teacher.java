@@ -1,7 +1,7 @@
 package com.huadi.intelligentteachingplatform.entity;
 
 import lombok.Data;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 public class Teacher {
@@ -10,6 +10,6 @@ public class Teacher {
     private String password;
     private String name;
     private String avatar;
-    private String phone;       // 💥 完美对应你的 tb_teacher.phone
-    private Date createTime;    // 💥 完美对应你的 tb_teacher.create_time
+    private String phone;
+    private LocalDateTime createTime;
 }
