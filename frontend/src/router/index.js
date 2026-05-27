@@ -16,6 +16,11 @@ const router = createRouter({
       // this generates a separate chunk (About.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue')
+    },
+    {
+      path: '/question',
+      name: 'QuestionManage',
+      component: () => import('../views/QuestionManage.vue') // 确保你之前在 views 下建的文件叫这个名字
     }
   ]
 })

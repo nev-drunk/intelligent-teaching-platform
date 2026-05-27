@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.ExamPaperMapper">
+
+    <insert id="insertPaper" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_exam_paper (course_id, title, total_score, class_id, teacher_id, create_time)
+        VALUES (#{courseId}, #{title}, #{totalScore}, #{classId}, #{teacherId}, NOW())
+    </insert>
+
+    <insert id="insertPaperQuestions">
+        INSERT INTO tb_paper_question (paper_id, question_id, score)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{paperId}, #{item.questionId}, #{item.score})
+        </foreach>
+    </insert>
+
+    <select id="selectPapersByTeacher" resultType="map">
+        SELECT
+            p.id,
+            p.title,
+            p.total_score as totalScore,
+            p.class_id as classId,
+            p.create_time as createTime,
+            (SELECT COUNT(*) FROM tb_paper_question pq WHERE pq.paper_id = p.id) as questionCount
+        FROM tb_exam_paper p
+        WHERE p.teacher_id = #{teacherId} AND p.course_id = #{courseId}
+        ORDER BY p.id DESC
+    </select>
+
+</mapper>
