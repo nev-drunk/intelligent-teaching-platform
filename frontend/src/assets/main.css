@@ -1,0 +1,35 @@
+/* 1. 导入基础样式（通常是一些变量定义，可以保留） */
+@import './base.css';
+
+/* 2. 彻底重置 #app 的限制 */
+#app {
+  /* 必须删除原来的 max-width: 1280px 和 margin: 0 auto */
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important; /* 之前的 2rem 也会导致四周有白边 */
+  
+  display: block !important; /* 强制覆盖底部的 grid 布局 */
+  font-weight: normal;
+}
+
+/* 3. 彻底覆盖底部的媒体查询限制 */
+@media (min-width: 1024px) {
+  body {
+    display: block !important; /* 之前的 place-items: center 会导致内容在屏幕中心 */
+  }
+
+  #app {
+    /* 必须强制改为单列，否则你的布局会莫名其妙变成左右两半 */
+    display: block !important; 
+    grid-template-columns: none !important;
+    padding: 0 !important;
+  }
+}
+
+/* 其他链接颜色样式可以保留 */
+a, .green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+}

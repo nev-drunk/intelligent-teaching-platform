@@ -4,9 +4,9 @@ server:
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/smart_study_teacher?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf-8
+    url: jdbc:mysql://localhost:3306/intelligent_teaching?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf-8
     username: root
-    password: 123456zcl #?????????
+    password: 5201314zsy
 
   servlet:
     multipart:
@@ -20,6 +20,6 @@ mybatis:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
-deepseek:
-  api-key: sk-d2a2dad54ddb4d5f9d91c83d87b91ff1
-  api-url: https://api.deepseek.com/chat/completions
+file:
+  upload:
+    path: uploads/

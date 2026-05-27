@@ -4,12 +4,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class Teacher {
+public class Course {
     private Long id;
-    private String username;
-    private String password;
-    private String name;
-    private String avatar;
-    private String phone;
+    private String courseName;
+    private Long teacherId;
+    private String description;
     private LocalDateTime createTime;
 }
