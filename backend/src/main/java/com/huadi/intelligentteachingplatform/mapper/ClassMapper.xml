@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.ClassMapper">
+
+    <select id="selectByTeacherId" resultType="com.huadi.intelligentteachingplatform.entity.TeachingClass">
+        SELECT id, class_name AS className, teacher_id AS teacherId
+        FROM tb_class
+        WHERE teacher_id = #{teacherId}
+        ORDER BY id
+    </select>
+
+    <select id="selectAll" resultType="com.huadi.intelligentteachingplatform.entity.TeachingClass">
+        SELECT id, class_name AS className, teacher_id AS teacherId
+        FROM tb_class
+        ORDER BY id
+    </select>
+
+</mapper>

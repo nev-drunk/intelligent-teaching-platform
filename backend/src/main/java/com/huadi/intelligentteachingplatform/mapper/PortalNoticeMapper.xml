@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.PortalNoticeMapper">
+
+    <select id="selectAllOrderByCreateTimeDesc"
+            resultType="com.huadi.intelligentteachingplatform.entity.PortalNotice">
+        SELECT id, teacher_id AS teacherId, title, content, tts_audio_url AS ttsAudioUrl, create_time AS createTime
+        FROM tb_portal_notice
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_portal_notice (teacher_id, title, content, tts_audio_url)
+        VALUES (#{teacherId}, #{title}, #{content}, #{ttsAudioUrl})
+    </insert>
+
+    <select id="selectById" resultType="com.huadi.intelligentteachingplatform.entity.PortalNotice">
+        SELECT id, teacher_id AS teacherId, title, content, tts_audio_url AS ttsAudioUrl, create_time AS createTime
+        FROM tb_portal_notice
+        WHERE id = #{id}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM tb_portal_notice WHERE id = #{id}
+    </delete>
+
+</mapper>
