@@ -193,11 +193,3 @@ INSERT INTO `tb_class` (`id`, `class_name`, `teacher_id`) VALUES (1, '2024级软
 INSERT INTO `tb_course` (`id`, `course_name`, `teacher_id`, `description`) VALUES (1, '大模型应用与微调技术', 1, '本课程讲授深度学习、大模型接口调用及提示词工程。');
 
 SET FOREIGN_KEY_CHECKS = 1;
-
-ALTER TABLE tb_exam_paper ADD COLUMN class_id BIGINT COMMENT '发布的班级ID';
-
--- 1. 给试卷表增加教师归属字段，用于多老师独立发布隔离
-ALTER TABLE tb_exam_paper ADD COLUMN teacher_id BIGINT COMMENT '教师ID';
-
--- 2. (可选) 如果你想让题目也区分是谁录入的，也可以给题目表追加
-ALTER TABLE tb_question ADD COLUMN teacher_id BIGINT DEFAULT 1 COMMENT '教师ID';
