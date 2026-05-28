@@ -1,92 +1,141 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { speakText } from '@/utils/tts'
+import { ref, onMounted, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { fetchSubmissions, updateComment } from '@/api/submission'
 
-const comments = ref([
-  {
-    id: 1,
-    studentName: '李明',
-    courseName: '大模型应用与微调技术',
-    taskTitle: '第一次编程作业',
-    comment: '本次作业完成情况良好，对Transformer架构的理解比较深入，代码实现规范，希望继续保持对前沿技术的学习热情。',
-    score: 92,
-    createTime: '2026-05-20 14:30'
-  },
-  {
-    id: 2,
-    studentName: '王小红',
-    courseName: '大模型应用与微调技术',
-    taskTitle: '第二次编程作业',
-    comment: '作业质量有明显提升，对提示词工程有了更深的理解。建议加强对上下文窗口机制的学习，注意作业提交的规范性。',
-    score: 88,
-    createTime: '2026-05-18 09:15'
-  },
-  {
-    id: 3,
-    studentName: '张伟',
-    courseName: '大模型应用与微调技术',
-    taskTitle: '第三次编程作业',
-    comment: '本次作业完成认真，对微调技术的实验设计合理，超参数选择恰当。继续加油，期待看到更多创新性的实验结果。',
-    score: 95,
-    createTime: '2026-05-15 16:45'
-  }
-])
-
-const selectedComment = ref(null)
+const auth = useAuthStore()
+const submissions = ref([])
+const loading = ref(true)
+const errorMessage = ref('')
+const selectedSubmission = ref(null)
 const isSpeaking = ref(false)
+const showModal = ref(false)
+const editingComment = ref(null)
 
-function speakComment(comment) {
-  if (isSpeaking.value && selectedComment.value === comment.id) {
+const filteredSubmissions = computed(() => submissions.value)
+
+onMounted(async () => {
+  await loadSubmissions()
+})
+
+async function loadSubmissions() {
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const teacherId = Number(auth.teacherId) || 1
+    const res = await fetchSubmissions(teacherId)
+    submissions.value = res.data || []
+  } catch (e) {
+    errorMessage.value = e.message || '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function getScoreClass(score) {
+  if (!score) return 'score--pending'
+  if (score >= 90) return 'score--excellent'
+  if (score >= 80) return 'score--good'
+  if (score >= 60) return 'score--pass'
+  return 'score--fail'
+}
+
+function openCommentModal(submission) {
+  editingComment.value = {
+    id: submission.id,
+    comment: submission.teacherComment || '',
+    score: submission.teacherScore || null,
+    studentName: submission.studentName,
+    taskTitle: submission.taskTitle,
+    courseName: submission.courseName
+  }
+  showModal.value = true
+}
+
+async function saveComment() {
+  if (!editingComment.value.comment.trim()) {
+    errorMessage.value = '评语不能为空'
+    return
+  }
+  errorMessage.value = ''
+  try {
+    await updateComment(
+      editingComment.value.id,
+      editingComment.value.comment,
+      editingComment.value.score
+    )
+    showModal.value = false
+    editingComment.value = null
+    await loadSubmissions()
+  } catch (e) {
+    errorMessage.value = e.message || '保存失败'
+  }
+}
+
+function speakSubmission(submission) {
+  if (isSpeaking.value && selectedSubmission.value === submission.id) {
     window.speechSynthesis.cancel()
     isSpeaking.value = false
-    selectedComment.value = null
+    selectedSubmission.value = null
     return
   }
   if (isSpeaking.value) {
     window.speechSynthesis.cancel()
   }
-  selectedComment.value = comment.id
-  const text = `学生姓名：${comment.studentName}。课程：${comment.courseName}。作业标题：${comment.taskTitle}。评语：${comment.comment}。得分：${comment.score}分。`
+  selectedSubmission.value = submission.id
+  const text = `学生姓名：${submission.studentName}。课程：${
+    submission.courseName || '未知课程'
+  }。作业标题：${submission.taskTitle || '未知作业'}。提交内容：${
+    submission.submitText || '无'
+  }。教师评语：${submission.teacherComment || '暂无评语'}。得分：${
+    submission.teacherScore || '未评分'
+  }分。`
   isSpeaking.value = true
   const utterance = new SpeechSynthesisUtterance(text)
   const voices = window.speechSynthesis.getVoices()
   if (voices.length > 0) {
-    utterance.voice = voices.find(v => v.lang.includes('zh')) || voices[0]
+    utterance.voice = voices.find((v) => v.lang.includes('zh')) || voices[0]
   }
   utterance.onend = () => {
     isSpeaking.value = false
-    selectedComment.value = null
+    selectedSubmission.value = null
   }
   utterance.onerror = () => {
     isSpeaking.value = false
-    selectedComment.value = null
+    selectedSubmission.value = null
   }
   window.speechSynthesis.speak(utterance)
 }
 
-function speakAllComments() {
+function speakAllSubmissions() {
   if (isSpeaking.value) {
     window.speechSynthesis.cancel()
     isSpeaking.value = false
-    selectedComment.value = null
+    selectedSubmission.value = null
     return
   }
   isSpeaking.value = true
   let index = 0
   const voices = window.speechSynthesis.getVoices()
-  
+
   function speakNext() {
-    if (index >= comments.value.length || !isSpeaking.value) {
+    if (index >= submissions.value.length || !isSpeaking.value) {
       isSpeaking.value = false
-      selectedComment.value = null
+      selectedSubmission.value = null
       return
     }
-    const comment = comments.value[index]
-    selectedComment.value = comment.id
-    const text = `学生姓名：${comment.studentName}。课程：${comment.courseName}。作业标题：${comment.taskTitle}。评语：${comment.comment}。得分：${comment.score}分。`
+    const submission = submissions.value[index]
+    selectedSubmission.value = submission.id
+    const text = `学生姓名：${submission.studentName}。课程：${
+      submission.courseName || '未知课程'
+    }。作业标题：${submission.taskTitle || '未知作业'}。提交内容：${
+      submission.submitText || '无'
+    }。教师评语：${submission.teacherComment || '暂无评语'}。得分：${
+      submission.teacherScore || '未评分'
+    }分。`
     const utterance = new SpeechSynthesisUtterance(text)
     if (voices.length > 0) {
-      utterance.voice = voices.find(v => v.lang.includes('zh')) || voices[0]
+      utterance.voice = voices.find((v) => v.lang.includes('zh')) || voices[0]
     }
     utterance.onend = () => {
       if (isSpeaking.value) {
@@ -96,15 +145,23 @@ function speakAllComments() {
     }
     utterance.onerror = () => {
       isSpeaking.value = false
-      selectedComment.value = null
+      selectedSubmission.value = null
     }
     window.speechSynthesis.speak(utterance)
   }
   speakNext()
 }
 
-onMounted(() => {
-})
+function formatTime(time) {
+  if (!time) return '未知时间'
+  return new Date(time).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 </script>
 
 <template>
@@ -112,59 +169,183 @@ onMounted(() => {
     <div class="page-header">
       <div>
         <h2>学生作业评语</h2>
-        <p>将评语转换为语音，方便学生收听学习反馈</p>
+        <p>语音播报评语，方便学生收听学习反馈</p>
       </div>
-      <button class="speak-all-btn" @click="speakAllComments" :disabled="isSpeaking">
-        <span v-if="!isSpeaking">🔊 朗读全部评语</span>
-        <span v-else>⏹ 停止朗读</span>
+      <button
+        class="btn btn--primary"
+        @click="speakAllSubmissions"
+        :disabled="isSpeaking || submissions.length === 0"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M11 5L6 9H2v6h4l5 4V5z"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M15.54 8.46a5 5 0 0 1 0 7.07"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+          <path
+            d="M19.07 4.93a10 10 0 0 1 0 14.14"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        {{ isSpeaking ? '停止朗读' : '朗读全部' }}
       </button>
     </div>
 
-    <div class="comments-grid">
+    <div v-if="errorMessage" class="error-message">
+      {{ errorMessage }}
+    </div>
+
+    <div v-if="loading" class="loading">加载中...</div>
+
+    <div v-else-if="submissions.length === 0" class="empty">
+      <p>暂无学生提交的作业</p>
+    </div>
+
+    <div v-else class="comments-grid">
       <article
-        v-for="comment in comments"
-        :key="comment.id"
-        class="comment-card"
-        :class="{ active: selectedComment === comment.id }"
+        v-for="submission in filteredSubmissions"
+        :key="submission.id"
+        class="card comment-card"
+        :class="{ active: selectedSubmission === submission.id }"
       >
         <div class="card-header">
           <div class="student-info">
             <span class="avatar">👨‍🎓</span>
             <div>
-              <h3>{{ comment.studentName }}</h3>
-              <p>{{ comment.courseName }}</p>
+              <h3>{{ submission.studentName }}</h3>
+              <p>{{ submission.courseName || '未知课程' }}</p>
             </div>
           </div>
-          <div class="score-badge">
-            <span class="score-value">{{ comment.score }}</span>
+          <div class="score-badge" :class="getScoreClass(submission.teacherScore)">
+            <span class="score-value">{{ submission.teacherScore || '--' }}</span>
             <span class="score-label">分</span>
           </div>
         </div>
 
         <div class="task-title">
-          <span>📝 {{ comment.taskTitle }}</span>
+          <span>{{ submission.taskTitle || '未知作业' }}</span>
+        </div>
+
+        <div class="submission-content">
+          <p class="content-label">提交内容：</p>
+          <p>{{ submission.submitText || '无' }}</p>
         </div>
 
         <div class="comment-content">
-          <p>{{ comment.comment }}</p>
+          <p class="content-label">教师评语：</p>
+          <p>{{ submission.teacherComment || '暂无评语' }}</p>
         </div>
 
         <div class="card-footer">
-          <span class="time">📅 {{ comment.createTime }}</span>
-          <button
-            class="speak-btn"
-            :class="{ speaking: selectedComment === comment.id && isSpeaking }"
-            @click="speakComment(comment)"
-          >
-            <span v-if="selectedComment === comment.id && isSpeaking">⏹ 停止</span>
-            <span v-else>🔊 语音播报</span>
-          </button>
+          <span class="time">{{ formatTime(submission.submitTime) }}</span>
+          <div class="actions">
+            <button
+              class="btn btn--ghost"
+              :class="{ 'btn--primary': selectedSubmission === submission.id && isSpeaking }"
+              @click="speakSubmission(submission)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M11 5L6 9H2v6h4l5 4V5z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M15.54 8.46a5 5 0 0 1 0 7.07"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M19.07 4.93a10 10 0 0 1 0 14.14"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              {{ selectedSubmission === submission.id && isSpeaking ? '停止' : '语音播报' }}
+            </button>
+            <button class="btn btn--ghost btn--primary" @click="openCommentModal(submission)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M14.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              撰写评语
+            </button>
+          </div>
         </div>
       </article>
     </div>
 
-    <div class="tts-info">
-      <p>💡 <strong>提示：</strong>点击"语音播报"按钮，系统将使用 TTS 语音合成技术将评语转换为自然流畅的语音，方便学生随时收听学习反馈。</p>
+    <!-- Modal -->
+    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>撰写评语</h3>
+          <button class="modal-close" @click="showModal = false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M18 6L6 18M6 6l12 12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="submission-info">
+            <p><strong>学生：</strong>{{ editingComment?.studentName }}</p>
+            <p><strong>作业：</strong>{{ editingComment?.taskTitle }}</p>
+            <p><strong>课程：</strong>{{ editingComment?.courseName }}</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">评分</label>
+            <input
+              v-model.number="editingComment.score"
+              type="number"
+              min="0"
+              max="100"
+              class="form-input"
+              placeholder="请输入评分（0-100）"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">评语内容</label>
+            <textarea
+              v-model="editingComment.comment"
+              class="form-textarea"
+              placeholder="请输入评语内容"
+              rows="4"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn--ghost" @click="showModal = false">取消</button>
+          <button class="btn btn--primary" @click="saveComment">保存评语</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -178,69 +359,106 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .page-header h2 {
-  margin: 0 0 6px;
-  color: var(--color-text-primary);
   font-size: 20px;
   font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
 }
 
 .page-header p {
+  font-size: 14px;
+  color: var(--text-muted);
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: 14px;
 }
 
-.speak-all-btn {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, var(--color-tech-blue) 0%, var(--color-tech-blue-dark) 100%);
-  color: #ffffff;
-  border: none;
+.error-message {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid var(--danger);
   border-radius: var(--radius-md);
-  font-weight: 600;
+  color: var(--danger);
   font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.loading,
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s ease;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+  font-family: inherit;
+  border: none;
 }
 
-.speak-all-btn:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
-  transform: translateY(-1px);
+.btn--primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 
-.speak-all-btn:disabled {
-  opacity: 0.7;
+.btn--primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btn--ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .comments-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: 20px;
 }
 
-.comment-card {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  padding: 24px;
-  box-shadow: var(--shadow-card);
-  transition: all 0.3s ease;
-  border: 2px solid transparent;
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s ease;
 }
 
-.comment-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-light);
 }
 
 .comment-card.active {
-  border-color: var(--color-tech-blue);
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
 }
 
 .card-header {
@@ -260,33 +478,55 @@ onMounted(() => {
 }
 
 .student-info h3 {
-  margin: 0 0 4px;
-  color: var(--color-text-primary);
   font-size: 16px;
   font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
 }
 
 .student-info p {
-  margin: 0;
-  color: var(--color-text-muted);
   font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
 }
 
 .score-badge {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-  color: #ffffff;
-  padding: 8px 16px;
-  border-radius: 24px;
+  padding: 8px 14px;
+  border-radius: 20px;
   font-weight: 700;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 60px;
-  box-shadow: 0 4px 12px rgba(22, 93, 255, 0.3);
+  min-width: 65px;
+}
+
+.score--excellent {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+}
+
+.score--good {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+}
+
+.score--pass {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #fff;
+}
+
+.score--fail {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+}
+
+.score--pending {
+  background: var(--bg-hover);
+  color: var(--text-muted);
 }
 
 .score-value {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
 }
 
@@ -297,27 +537,36 @@ onMounted(() => {
 }
 
 .task-title {
-  margin-bottom: 16px;
   padding: 12px 14px;
-  background: var(--color-tech-blue-subtle);
+  background: var(--primary-light);
   border-radius: var(--radius-md);
+  margin-bottom: 16px;
 }
 
 .task-title span {
-  color: var(--color-tech-blue);
+  color: var(--primary);
   font-size: 14px;
   font-weight: 500;
 }
 
+.submission-content,
 .comment-content {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
+.content-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.submission-content p,
 .comment-content p {
-  margin: 0;
-  color: var(--color-text-secondary);
   font-size: 14px;
+  color: var(--text-secondary);
   line-height: 1.7;
+  margin: 0;
 }
 
 .card-footer {
@@ -325,54 +574,129 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding-top: 16px;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--border-light);
 }
 
 .time {
-  color: var(--color-text-muted);
   font-size: 13px;
+  color: var(--text-muted);
 }
 
-.speak-btn {
-  padding: 8px 16px;
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s ease;
+.actions {
+  display: flex;
+  gap: 8px;
 }
 
-.speak-btn:hover,
-.speak-btn.speaking {
-  background: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
-  color: #ffffff !important;
-  animation: pulse 1.5s infinite;
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+.modal-content {
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
-.tts-info {
-  background: var(--color-tech-blue-subtle);
-  border-radius: var(--radius-lg);
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 20px 24px;
-  border-left: 4px solid var(--color-tech-blue);
+  border-bottom: 1px solid var(--border-light);
 }
 
-.tts-info p {
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 1.6;
 }
 
-.tts-info strong {
-  color: var(--color-tech-blue);
+.modal-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.submission-info {
+  padding: 12px 14px;
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+}
+
+.submission-info p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 4px 0;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  outline: none;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.form-textarea {
+  resize: vertical;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--border-light);
 }
 </style>

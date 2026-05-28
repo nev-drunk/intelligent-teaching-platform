@@ -1,22 +1,42 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
-const username = ref('admin')
-const password = ref('123456')
+const username = ref('')
+const password = ref('')
+const rememberMe = ref(false)
 const loading = ref(false)
 const error = ref('')
+
+// 页面加载时，如果有记住的用户名，自动填充
+onMounted(() => {
+  const remembered = auth.getRememberedUsername()
+  if (remembered) {
+    username.value = remembered
+    rememberMe.value = true
+  } else {
+    // 默认填充测试账号
+    username.value = 'admin'
+    password.value = '123456'
+  }
+})
 
 async function handleLogin() {
   error.value = ''
   loading.value = true
   try {
-    await auth.login(username.value, password.value)
-    router.push('/admin/portal')
+    await auth.login(username.value, password.value, rememberMe.value)
+    const redirect = route.query.redirect
+    router.push(
+      typeof redirect === 'string' && redirect.startsWith('/admin')
+        ? redirect
+        : { name: 'dashboard' }
+    )
   } catch (e) {
     error.value = e.message
   } finally {
@@ -30,10 +50,10 @@ async function handleLogin() {
     <div class="left-section">
       <div class="brand-area">
         <h1>全国教师管理信息系统</h1>
-       <div class="logo-area">
-  <img src="@/assets/teacher_logo.png" alt="logo" class="logo-icon" />
-  <span class="logo-text">中国教师</span>
-</div>
+        <div class="logo-area">
+          <img src="@/assets/teacher_logo.png" alt="logo" class="logo-icon" />
+          <span class="logo-text">中国教师</span>
+        </div>
       </div>
     </div>
     <div class="right-section">
@@ -42,15 +62,25 @@ async function handleLogin() {
         <form class="login-form" @submit.prevent="handleLogin">
           <div class="input-group">
             <span class="input-icon"></span>
-            <input v-model="username" type="text" placeholder="请输入用户名/手机号" autocomplete="username" />
+            <input
+              v-model="username"
+              type="text"
+              placeholder="请输入用户名/手机号"
+              autocomplete="username"
+            />
           </div>
           <div class="input-group">
             <span class="input-icon">🔒</span>
-            <input v-model="password" type="password" placeholder="请输入密码" autocomplete="current-password" />
+            <input
+              v-model="password"
+              type="password"
+              placeholder="请输入密码"
+              autocomplete="current-password"
+            />
           </div>
           <div class="form-options">
             <label class="remember-me">
-              <input type="checkbox" />
+              <input type="checkbox" v-model="rememberMe" />
               <span>记住我</span>
             </label>
             <div class="links">
@@ -63,6 +93,10 @@ async function handleLogin() {
             {{ loading ? '登录中…' : '登 录' }}
           </button>
         </form>
+        <div class="register-area">
+          <span>还没有账号？</span>
+          <router-link to="/register" class="register-link">立即注册</router-link>
+        </div>
         <router-link to="/portal" class="portal-link">→ 访问网站门户（免登录）</router-link>
       </div>
     </div>
@@ -73,7 +107,7 @@ async function handleLogin() {
 .login-page {
   min-height: 100vh;
   display: flex;
-  background: linear-gradient(135deg, #0A1628 0%, #165DFF 35%, #4080FF 70%, #80B3FF 100%);
+  background: linear-gradient(135deg, #0a1628 0%, #165dff 35%, #4080ff 70%, #80b3ff 100%);
   position: relative;
   overflow: hidden;
 }
@@ -234,7 +268,7 @@ async function handleLogin() {
   cursor: pointer;
 }
 
-.remember-me input[type="checkbox"] {
+.remember-me input[type='checkbox'] {
   width: 16px;
   height: 16px;
   accent-color: var(--color-primary);
@@ -272,19 +306,19 @@ async function handleLogin() {
   padding: 14px;
   border: none;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
   color: #ffffff;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
-  box-shadow: 0 4px 16px rgba(22, 93, 255, 0.28);
+  box-shadow: 0 4px 16px rgba(30, 64, 175, 0.35);
   letter-spacing: 3px;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--color-primary-dark) 0%, #003A8C 100%);
-  box-shadow: 0 8px 24px rgba(22, 93, 255, 0.35);
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e3a8a 100%);
+  box-shadow: 0 8px 24px rgba(30, 64, 175, 0.45);
   transform: translateY(-2px);
 }
 
@@ -298,12 +332,33 @@ async function handleLogin() {
   box-shadow: none;
 }
 
+.register-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.register-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
 .portal-link {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 28px;
+  margin-top: 16px;
   padding-top: 20px;
   font-size: 13px;
   color: var(--color-text-muted);
@@ -321,32 +376,32 @@ async function handleLogin() {
   .login-page {
     flex-direction: column;
   }
-  
+
   .left-section {
     padding: 40px 24px;
   }
-  
+
   .brand-area h1 {
     font-size: 28px;
     margin-bottom: 24px;
     letter-spacing: 4px;
   }
-  
+
   .logo-icon {
     width: 64px;
     height: 64px;
   }
-  
+
   .logo-text {
     font-size: 28px;
     letter-spacing: 4px;
   }
-  
+
   .right-section {
     width: 100%;
     padding: 24px;
   }
-  
+
   .login-card {
     padding: 32px 24px;
   }

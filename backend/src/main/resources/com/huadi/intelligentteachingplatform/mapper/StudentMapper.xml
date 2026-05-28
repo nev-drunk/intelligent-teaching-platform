@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.StudentMapper">
+
+    <resultMap id="StudentVOResultMap" type="com.huadi.intelligentteachingplatform.dto.student.StudentVO">
+        <id column="id" property="id"/>
+        <result column="student_name" property="studentName"/>
+        <result column="student_no" property="studentNo"/>
+        <result column="class_id" property="classId"/>
+        <result column="class_name" property="className"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectStudentPage" resultMap="StudentVOResultMap">
+        SELECT
+            t.id,
+            t.student_name,
+            t.student_no,
+            t.class_id,
+            c.class_name,
+            t.create_time
+        FROM tb_student t
+        LEFT JOIN tb_class c ON t.class_id = c.id
+        WHERE 1 = 1
+        <if test="studentName != null and studentName != ''">
+            AND t.student_name LIKE CONCAT('%', #{studentName}, '%')
+        </if>
+        <if test="studentNo != null and studentNo != ''">
+            AND t.student_no = #{studentNo}
+        </if>
+        <if test="classId != null">
+            AND t.class_id = #{classId}
+        </if>
+        ORDER BY t.create_time DESC
+    </select>
+
+</mapper>

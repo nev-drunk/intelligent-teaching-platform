@@ -12,7 +12,7 @@ const publishing = ref(false)
 const msg = ref('')
 const speakingId = ref(null)
 
-const blueColors = ['#1e40af', '#1e40af', '#1e40af']
+const blueColors = ['#2563eb', '#2563eb', '#2563eb']
 
 async function load() {
   const [c, n] = await Promise.all([fetchCarousel(), fetchNotices()])
@@ -91,7 +91,7 @@ onMounted(load)
         v-for="(slide, i) in slides"
         :key="i"
         class="mini-slide"
-        :style="{ background: slide.color }"
+        :style="{ '--accent-color': slide.color }"
       >
         <strong>{{ slide.title }}</strong>
         <span>{{ slide.subtitle }}</span>
@@ -104,7 +104,7 @@ onMounted(load)
         <p class="tts-tip">💥 TTS：发布后将自动朗读标题与正文（speechSynthesis）</p>
         <input v-model="form.title" type="text" placeholder="通知标题" />
         <textarea v-model="form.content" rows="5" placeholder="通知正文公告" />
-        <button type="button" :disabled="publishing" @click="handlePublish">
+        <button type="button" class="btn-publish" :disabled="publishing" @click="handlePublish">
           {{ publishing ? '发布中…' : '发布公告并语音播报' }}
         </button>
         <p v-if="msg" class="msg">{{ msg }}</p>
@@ -120,11 +120,11 @@ onMounted(load)
               <small>{{ n.createTime }}</small>
             </div>
             <div class="actions">
-              <button type="button" class="replay" :class="{ speaking: speakingId === n.id }" @click="replay(n)">
+              <button type="button" class="btn-outline btn-replay" :class="{ speaking: speakingId === n.id }" @click="replay(n)">
                 <span v-if="speakingId === n.id">⏹ 停止</span>
                 <span v-else>🔊 朗读</span>
               </button>
-              <button type="button" class="delete" @click="handleDelete(n)">🗑️ 删除</button>
+              <button type="button" class="btn-outline btn-delete" @click="handleDelete(n)">🗑️ 删除</button>
             </div>
           </li>
         </ul>
@@ -147,19 +147,22 @@ onMounted(load)
   min-width: 220px;
   padding: 20px;
   border-radius: var(--radius-lg);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: #ffffff;
+  border-left: 4px solid var(--accent-color, #2563eb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .mini-slide strong {
   display: block;
   margin-bottom: 8px;
   font-size: 16px;
+  font-weight: 700;
+  color: var(--text-inverse, #1f2937);
 }
 
 .mini-slide span {
   font-size: 14px;
-  opacity: 0.92;
+  color: var(--text-tertiary, #9ca3af);
 }
 
 .grid {
@@ -204,7 +207,7 @@ onMounted(load)
   box-sizing: border-box;
   margin-bottom: 16px;
   padding: 13px 16px;
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: 14px;
   transition: all 0.25s ease;
@@ -222,9 +225,10 @@ onMounted(load)
   color: var(--color-text-muted);
 }
 
-.panel button[type='button']:not(.replay) {
+.btn-publish {
+  width: 100%;
   padding: 13px 24px;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  background: var(--blue-primary, #2563eb);
   color: #ffffff;
   border: none;
   border-radius: var(--radius-md);
@@ -232,18 +236,15 @@ onMounted(load)
   font-weight: 600;
   font-size: 14px;
   transition: all 0.25s ease;
-  box-shadow: 0 4px 12px rgba(22, 93, 255, 0.25);
 }
 
-.panel button[type='button']:not(.replay):hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(22, 93, 255, 0.35);
-  transform: translateY(-1px);
+.btn-publish:hover:not(:disabled) {
+  background: var(--blue-dark, #1d4ed8);
 }
 
-.panel button:disabled {
+.btn-publish:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .msg {
@@ -307,11 +308,11 @@ onMounted(load)
   flex-shrink: 0;
 }
 
-.replay {
+.btn-outline {
   padding: 8px 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-bg-card);
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 13px;
@@ -319,11 +320,16 @@ onMounted(load)
   transition: all 0.25s ease;
 }
 
-.panel.list .replay:hover,
-.panel.list .replay.speaking {
-  background: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
-  color: #ffffff !important;
+.btn-replay:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-replay.speaking {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
   animation: pulse 1.5s infinite;
 }
 
@@ -332,22 +338,10 @@ onMounted(load)
   50% { opacity: 0.7; }
 }
 
-.panel.list .delete {
-  padding: 8px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-card) !important;
-  color: var(--color-text-secondary) !important;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.25s ease;
-}
-
-.panel.list .delete:hover {
-  background: var(--color-danger) !important;
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.08);
   border-color: var(--color-danger);
-  color: #ffffff !important;
+  color: var(--color-danger);
 }
 
 .empty {

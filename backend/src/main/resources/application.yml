@@ -1,25 +1,62 @@
 server:
   port: 8081
+  tomcat:
+    uri-encoding: UTF-8
 
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/intelligent_teaching?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf-8
+    url: jdbc:mysql://localhost:3306/smart_study_teacher?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&connectionCollation=utf8mb4_unicode_ci&characterSetResults=UTF-8
     username: root
-    password: 5201314zsy
+    password: 123456zcl
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:init.sql
+      encoding: UTF-8
 
   servlet:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
 
-mybatis:
+  http:
+    encoding:
+      charset: UTF-8
+      force: true
+      enabled: true
+      force-request: true
+      force-response: true
+
+mybatis-plus:
+  mapper-locations: classpath*:com/huadi/intelligentteachingplatform/mapper/*.xml
   type-aliases-package: com.huadi.intelligentteachingplatform.entity
-  mapper-locations: classpath:com/huadi/intelligentteachingplatform/mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    charset: UTF-8
+  global-config:
+    db-config:
+      id-type: auto
+      table-underline: true
 
 file:
   upload:
     path: uploads/
+
+deepseek:
+  api-key: sk-d2a2dad54ddb4d5f9d91c83d87b91ff1
+  api-url: https://api.deepseek.com/chat/completions
+
+baidu:
+  ocr:
+    app-id: "7796798"
+    api-key: "uQ763DvEsSwTWOhS6QWvuHcS"
+    secret-key: "tz9hG4nc5ViCoj93JFz0xUKXsLKLVfR7"
+    connection-timeout: 5000
+    read-timeout: 10000
+
+jwt:
+  secret: IntelligentTeachingPlatform2024SecretKeyForJwtToken
+  expire-hours: 24

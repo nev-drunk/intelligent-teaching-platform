@@ -1,30 +1,31 @@
 package com.huadi.intelligentteachingplatform.entity;
 
-import java.util.Date;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@TableName("tb_exam_paper")
 public class ExamPaper {
+    @TableId(type = IdType.AUTO)
     private Long id;
+    @TableField("course_id")
     private Long courseId;
     private String title;
+    @TableField("total_score")
     private Integer totalScore;
+    @TableField("class_id")
     private Long classId;
-    private Long teacherId; // 💥 新增：支持多教师多卷隔离
-    private Date createTime;
+    @TableField("teacher_id")
+    private Long teacherId;
+    @TableField("create_time")
+    private LocalDateTime createTime;
 
-    // 以下为完整 Getter / Setter
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getCourseId() { return courseId; }
-    public void setCourseId(Long courseId) { this.courseId = courseId; }
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public Integer totalScore() { return totalScore; }
-    public Integer getTotalScore() { return totalScore; }
-    public void setTotalScore(Integer totalScore) { this.totalScore = totalScore; }
-    public Long getClassId() { return classId; }
-    public void setClassId(Long classId) { this.classId = classId; }
-    public Long getTeacherId() { return teacherId; }
-    public void setTeacherId(Long teacherId) { this.teacherId = teacherId; }
-    public Date getCreateTime() { return createTime; }
-    public void setCreateTime(Date createTime) { this.createTime = createTime; }
+    @TableField(exist = false)
+    private List<PaperQuestion> paperQuestions;
 }

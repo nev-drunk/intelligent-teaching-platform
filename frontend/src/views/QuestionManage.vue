@@ -1,34 +1,5 @@
 <template>
   <div class="app">
-    <!-- ════════════════════════════ HEADER ════════════════════════════ -->
-    <header class="header">
-      <div class="header-left">
-        <div class="brand">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect width="28" height="28" rx="7" fill="#2563EB" />
-            <path
-              d="M7 14L12 19L21 9"
-              stroke="white"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          <span class="brand-name">智能教学平台</span>
-        </div>
-        <span class="course-tag">📚 大模型应用与微调技术</span>
-      </div>
-      <div class="header-right">
-        <div class="teacher-selector">
-          <span class="selector-label">当前教师</span>
-          <select v-model="currentTeacherId" @change="handleTeacherChange" class="teacher-select">
-            <option :value="1">张教授</option>
-            <option :value="2">李副教授</option>
-          </select>
-        </div>
-      </div>
-    </header>
-
     <!-- ════════════════════════════ TABS ════════════════════════════ -->
     <div class="tab-bar">
       <button
@@ -698,11 +669,12 @@
                     <th width="100">总分</th>
                     <th width="90">题目数</th>
                     <th width="170">发布时间</th>
+                    <th width="100">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="paperHistory.length === 0">
-                    <td colspan="6" class="table-empty">该教师名下暂无已发布试卷</td>
+                    <td colspan="7" class="table-empty">该教师名下暂无已发布试卷</td>
                   </tr>
                   <tr v-for="paper in paperHistory" :key="paper.id">
                     <td>
@@ -717,6 +689,27 @@
                     </td>
                     <td>{{ paper.questionCount }} 题</td>
                     <td class="time-cell">{{ formatDate(paper.createTime) }}</td>
+                    <td>
+                      <button class="btn btn--ghost btn--view" @click="viewPaper(paper)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                          <path
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                        查看
+                      </button>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -726,24 +719,193 @@
       </transition>
     </div>
 
+    <!-- ── 查看试卷弹窗 ── -->
+    <transition name="modal-fade">
+      <div v-if="viewPaperModal" class="modal-overlay" @click.self="closeViewPaperModal">
+        <div class="modal-content modal-content--paper">
+          <div class="modal-header">
+            <div class="modal-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <polyline
+                  points="14 2 14 8 20 8"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <line
+                  x1="16"
+                  y1="13"
+                  x2="8"
+                  y2="13"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <line
+                  x1="16"
+                  y1="17"
+                  x2="8"
+                  y2="17"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <polyline
+                  points="10 9 9 9 8 9"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              试卷详情
+            </div>
+            <button class="modal-close" @click="closeViewPaperModal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M6 18L18 6M6 6l12 12"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div v-if="currentPaper" class="paper-header-info">
+              <div class="paper-title">{{ currentPaper.title }}</div>
+              <div class="paper-meta">
+                <span class="paper-meta-item">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  {{ getClassName(currentPaper.classId) }}
+                </span>
+                <span class="paper-meta-item">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  {{ formatDate(currentPaper.createTime) }}
+                </span>
+                <span class="paper-meta-item">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  共 {{ currentPaper.questionCount }} 题 / {{ currentPaper.totalScore }} 分
+                </span>
+              </div>
+            </div>
+            <div class="paper-questions">
+              <div
+                v-for="(item, index) in currentPaperQuestions"
+                :key="item.id || index"
+                class="question-item"
+              >
+                <div class="question-number">{{ index + 1 }}</div>
+                <div class="question-content">
+                  <div class="question-header">
+                    <span
+                      class="type-badge"
+                      :class="`type-badge--${item.type?.toLowerCase() || 'single'}`"
+                    >
+                      {{ typeLabel(item.type) }}
+                    </span>
+                    <span class="question-score">{{ item.score }} 分</span>
+                  </div>
+                  <div class="question-text">{{ item.content }}</div>
+                  <div v-if="item.options" class="question-options">
+                    <div
+                      v-for="(opt, idx) in item.options.split(';').filter(Boolean)"
+                      :key="idx"
+                      class="option-item"
+                    >
+                      {{ opt }}
+                    </div>
+                  </div>
+                  <div class="question-answer">
+                    <span class="answer-label">参考答案：</span>
+                    <span class="answer-value">{{ item.answer }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="currentPaperQuestions.length === 0" class="empty-paper">暂无题目数据</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn--ghost" @click="closeViewPaperModal">关闭</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- ── Toast ── -->
     <transition name="toast-fade">
       <div v-if="toast.show" :class="['toast', 'toast--' + toast.type]">
-        <svg v-if="toast.type === 'success'" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="7" fill="#10B981" />
-          <path
-            d="M5 8l2 2 4-4"
-            stroke="white"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="7" fill="#EF4444" />
-          <path d="M8 5v3M8 11v.5" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        {{ toast.msg }}
+        <div class="toast-icon">
+          <svg
+            v-if="toast.type === 'success'"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <path
+              d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <div class="toast-content">
+          <span class="toast-title">{{ toast.type === 'success' ? '成功' : '提示' }}</span>
+          <span class="toast-message">{{ toast.msg }}</span>
+        </div>
+        <button class="toast-close" @click="toast.show = false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M6 18L18 6M6 6l12 12"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
       </div>
     </transition>
   </div>
@@ -751,9 +913,8 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import axios from 'axios'
-
-const BASE = 'http://localhost:8081'
+import { listQuestions, aiGenerate, saveQuestion } from '@/api/question'
+import { listPapers, publishPaper, getPaper } from '@/api/paper'
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const currentTeacherId = ref(1)
@@ -786,6 +947,32 @@ function showToast(msg, type = 'success') {
   setTimeout(() => {
     toast.value.show = false
   }, 3000)
+}
+
+// ── 查看试卷弹窗 ───────────────────────────────────────────────────────────────
+const viewPaperModal = ref(false)
+const currentPaper = ref(null)
+const currentPaperQuestions = ref([])
+
+async function viewPaper(paper) {
+  currentPaper.value = paper
+  currentPaperQuestions.value = []
+  viewPaperModal.value = true
+  try {
+    const res = await getPaper(paper.id)
+    if (res && res.questions) {
+      currentPaperQuestions.value = res.questions
+    }
+  } catch (e) {
+    console.error('viewPaper', e)
+    showToast('获取试卷详情失败', 'error')
+  }
+}
+
+function closeViewPaperModal() {
+  viewPaperModal.value = false
+  currentPaper.value = null
+  currentPaperQuestions.value = []
 }
 
 // ── Computed ──────────────────────────────────────────────────────────────────
@@ -906,19 +1093,18 @@ function switchTab(tab) {
 // ── API calls ─────────────────────────────────────────────────────────────────
 async function fetchList() {
   try {
-    const res = await axios.get(`${BASE}/api/question/list?courseId=${courseId.value}`)
-    questionList.value = Array.isArray(res.data) ? res.data : []
+    const res = await listQuestions(courseId.value)
+    questionList.value = Array.isArray(res) ? res : []
   } catch (e) {
     console.error('fetchList', e)
+    showToast('加载题目失败，请检查后端连接', 'error')
   }
 }
 
 async function fetchPaperHistory() {
   try {
-    const res = await axios.get(
-      `${BASE}/api/question/papers?teacherId=${currentTeacherId.value}&courseId=${courseId.value}`
-    )
-    paperHistory.value = Array.isArray(res.data) ? res.data : []
+    const res = await listPapers()
+    paperHistory.value = Array.isArray(res) ? res : []
   } catch (e) {
     console.error('fetchPaperHistory', e)
   }
@@ -939,7 +1125,7 @@ async function handleAdd() {
     return
   }
   try {
-    await axios.post(`${BASE}/api/question/add`, {
+    await saveQuestion({
       courseId: courseId.value,
       ...form.value
     })
@@ -958,18 +1144,14 @@ async function handleAiGenerate() {
   }
   isAiLoading.value = true
   try {
-    const res = await axios.post(`${BASE}/api/question/ai-generate`, {
+    const res = await aiGenerate({
       courseId: courseId.value,
       keyword: keyword.value
     })
-    if (res.data.code === 200) {
-      lastAiQuestion.value = res.data.data
-      keyword.value = ''
-      showToast('AI 出题成功并已入库')
-      fetchList()
-    } else {
-      showToast(res.data.msg || 'AI 出题失败', 'error')
-    }
+    lastAiQuestion.value = res
+    keyword.value = ''
+    showToast('AI 出题成功并已入库')
+    fetchList()
   } catch (e) {
     showToast('AI 接口异常，请检查 API Key', 'error')
   } finally {
@@ -997,25 +1179,21 @@ async function handleCreatePaper() {
   }))
 
   try {
-    const res = await axios.post(`${BASE}/api/question/create-paper`, {
+    await publishPaper({
       courseId: courseId.value,
       title: paperTitle.value,
       classId: selectedClassId.value,
       teacherId: currentTeacherId.value,
       items
     })
-    if (res.data.code === 200) {
-      showToast(res.data.msg || '试卷发布成功')
-      paperTitle.value = ''
-      selectedClassId.value = ''
-      selectedQuestionIds.value = []
-      questionScores.value = {}
-      fetchPaperHistory()
-    } else {
-      showToast(res.data.msg || '发布失败', 'error')
-    }
+    showToast('试卷发布成功')
+    paperTitle.value = ''
+    selectedClassId.value = ''
+    selectedQuestionIds.value = []
+    questionScores.value = {}
+    fetchPaperHistory()
   } catch (e) {
-    showToast(e.response?.data?.msg || '发布失败，请检查后端', 'error')
+    showToast(e.message || '发布失败，请检查后端', 'error')
   }
 }
 
@@ -1097,67 +1275,8 @@ onMounted(() => {
     sans-serif;
   font-size: 14px;
   color: var(--text);
-  background: var(--bg);
-  min-height: 100vh;
-}
-
-/* ═════════ Header ═════════ */
-.header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 28px;
-  box-shadow: 0 1px 0 var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.brand-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
-}
-.course-tag {
-  background: var(--blue-lt);
-  color: var(--blue);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid var(--blue-md);
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.selector-label {
-  font-size: 12px;
-  color: var(--text-3);
-}
-.teacher-select {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 13px;
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  cursor: pointer;
+  background: transparent;
+  min-height: 100%;
 }
 
 /* ═════════ Tab bar ═════════ */
@@ -1167,6 +1286,7 @@ onMounted(() => {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
 }
 .tab {
   display: flex;
@@ -1277,35 +1397,40 @@ onMounted(() => {
 
 /* ═════════ Card ═════════ */
 .card {
-  background: var(--surface);
-  border-radius: var(--radius);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  padding: 22px 24px;
-  box-shadow: var(--shadow);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-light);
 }
 .card-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 .card-title-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 .dot--blue {
-  background: var(--blue);
+  background: var(--primary);
 }
 .dot--green {
-  background: var(--green);
+  background: var(--success);
 }
 .dot--amber {
-  background: var(--amber);
+  background: var(--warning);
 }
 .dot--purple {
   background: var(--purple);
@@ -1523,14 +1648,14 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 9px 18px;
-  border-radius: 8px;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
   border: none;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s ease;
   font-family: inherit;
   position: relative;
 }
@@ -1538,38 +1663,60 @@ onMounted(() => {
   transform: scale(0.98);
 }
 .btn--blue {
-  background: var(--blue);
+  background: var(--primary);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 .btn--blue:hover {
-  background: #1d4ed8;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  background: var(--primary-hover);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  transform: translateY(-0.5px);
 }
 .btn--amber {
-  background: var(--amber);
+  background: var(--warning);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 .btn--amber:hover {
   background: #d97706;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+  transform: translateY(-0.5px);
 }
 .btn--ghost {
-  background: var(--bg);
-  color: var(--text-2);
+  background: transparent;
+  color: var(--text-muted);
   border: 1px solid var(--border);
-  padding: 7px 12px;
+  padding: 8px 14px;
   font-size: 13px;
+  font-weight: 500;
 }
 .btn--ghost:hover {
-  background: #f8fafc;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.btn--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn--danger:hover {
+  background: #fef2f2;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+.btn--view {
+  color: var(--primary);
+  border-color: var(--primary-light);
+}
+.btn--view:hover {
+  background: var(--primary-light);
 }
 .btn--full {
   width: 100%;
 }
 .btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none !important;
+  box-shadow: none !important;
 }
 .btn-spinner {
   width: 14px;
@@ -1921,41 +2068,285 @@ onMounted(() => {
   font-size: 13px;
 }
 
-/* ═════════ Toast ═════════ */
-.toast {
+/* ═════════ Modal ═════════ */
+.modal-overlay {
   position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 999;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-content {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-content--paper {
+  max-width: 900px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-card);
+  background: var(--bg-page);
+}
+.modal-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 18px;
-  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.modal-close:hover {
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+}
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-card);
+}
+
+/* ── Paper modal styles ── */
+.paper-header-info {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-card);
+}
+.paper-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.paper-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.paper-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.paper-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.question-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-page);
+  border-radius: var(--radius-md);
+}
+.question-number {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+}
+.question-content {
+  flex: 1;
+  min-width: 0;
+}
+.question-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.question-score {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  padding: 2px 8px;
+  background: var(--amber-lt);
+  border-radius: 4px;
+}
+.question-text {
   font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.option-item {
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.question-answer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-card);
+}
+.answer-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.answer-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+}
+.empty-paper {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: all 0.3s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-enter-from .modal-content,
+.modal-fade-leave-to .modal-content {
+  transform: scale(0.95);
+}
+
+/* ═════════ Toast ═════════ */
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
   font-weight: 500;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  min-width: 280px;
+  max-width: 400px;
 }
 .toast--success {
-  border-left: 3px solid var(--green);
+  background: var(--green-light);
+  border-color: var(--green-eco);
+}
+.toast--success .toast-icon {
+  color: var(--green-eco);
+}
+.toast--success .toast-title {
+  color: var(--green-eco);
 }
 .toast--error {
-  border-left: 3px solid var(--red);
+  background: var(--red-light);
+  border-color: var(--red-primary);
+}
+.toast--error .toast-icon {
+  color: var(--red-primary);
+}
+.toast--error .toast-title {
+  color: var(--red-primary);
+}
+.toast-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+.toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.toast-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.toast-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.toast-close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.toast-close:hover {
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.05);
 }
 .toast-fade-enter-active,
 .toast-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .toast-fade-enter-from {
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateX(20px);
 }
 .toast-fade-leave-to {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateX(20px);
 }
 
 /* ═════════ Transitions ═════════ */

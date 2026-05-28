@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.QuestionnaireAnswerMapper">
+
+    <resultMap id="BaseResultMap" type="com.huadi.intelligentteachingplatform.entity.QuestionnaireAnswer">
+        <id column="id" property="id"/>
+        <result column="questionnaire_id" property="questionnaireId"/>
+        <result column="student_id" property="studentId"/>
+        <result column="student_name" property="studentName"/>
+        <result column="scores_json" property="scoresJson"/>
+        <result column="total_score" property="totalScore"/>
+        <result column="submit_time" property="submitTime"/>
+    </resultMap>
+
+    <!-- 插入学生提交的答案 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_questionnaire_answer (questionnaire_id, student_id, student_name, scores_json, total_score)
+        VALUES (#{questionnaireId}, #{studentId}, #{studentName}, #{scoresJson}, #{totalScore})
+    </insert>
+
+    <!-- 查询某份问卷的所有答案 -->
+    <select id="selectByQuestionnaireId" resultMap="BaseResultMap">
+        SELECT * FROM tb_questionnaire_answer
+        WHERE questionnaire_id = #{questionnaireId}
+        ORDER BY submit_time DESC
+    </select>
+
+    <!-- 查询某学生在某问卷中是否已提交 -->
+    <select id="selectByQuestionnaireAndStudent" resultMap="BaseResultMap">
+        SELECT * FROM tb_questionnaire_answer
+        WHERE questionnaire_id = #{questionnaireId} AND student_id = #{studentId}
+        LIMIT 1
+    </select>
+
+    <!-- 计算某份问卷的平均分 -->
+    <select id="calculateAvgScore" resultType="java.math.BigDecimal">
+        SELECT AVG(total_score) FROM tb_questionnaire_answer
+        WHERE questionnaire_id = #{questionnaireId}
+    </select>
+
+</mapper>

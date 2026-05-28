@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.IssueMapper">
+
+    <resultMap id="BaseResultMap" type="com.huadi.intelligentteachingplatform.entity.Issue">
+        <id column="id" property="id"/>
+        <result column="course_id" property="courseId"/>
+        <result column="student_name" property="studentName"/>
+        <result column="question_text" property="questionText"/>
+        <result column="ai_suggested_answer" property="aiSuggestedAnswer"/>
+        <result column="teacher_reply" property="teacherReply"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT id, course_id, student_name, question_text, ai_suggested_answer,
+               teacher_reply, status, create_time
+        FROM tb_issue_center
+        <where>
+            <if test="courseId != null">
+                course_id = #{courseId}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT id, course_id, student_name, question_text, ai_suggested_answer,
+               teacher_reply, status, create_time
+        FROM tb_issue_center
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.huadi.intelligentteachingplatform.entity.Issue"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_issue_center (course_id, student_name, question_text, status)
+        VALUES (#{courseId}, #{studentName}, #{questionText}, 0)
+    </insert>
+
+    <update id="updateReply">
+        UPDATE tb_issue_center
+        SET teacher_reply = #{teacherReply},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM tb_issue_center WHERE id = #{id}
+    </delete>
+
+</mapper>

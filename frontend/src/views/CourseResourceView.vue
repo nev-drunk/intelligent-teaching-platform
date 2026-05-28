@@ -309,7 +309,7 @@ const closeCropModal = () => {
 }
 
 const goBack = () => {
-  router.push('/course')
+  router.push({ name: 'courses' })
 }
 
 const formatDate = (dateStr) => {

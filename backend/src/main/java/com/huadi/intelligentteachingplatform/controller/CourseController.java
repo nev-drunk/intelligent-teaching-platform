@@ -1,176 +1,128 @@
 package com.huadi.intelligentteachingplatform.controller;
 
+import com.huadi.intelligentteachingplatform.common.ApiResponse;
 import com.huadi.intelligentteachingplatform.entity.Course;
 import com.huadi.intelligentteachingplatform.entity.CourseResource;
-import com.huadi.intelligentteachingplatform.mapper.CourseMapper;
-import com.huadi.intelligentteachingplatform.mapper.CourseResourceMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
+import com.huadi.intelligentteachingplatform.service.CourseService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/course")
+@RequestMapping("/api/courses") // 统一使用规范的复数形式 RESTful 路径
+@RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class CourseController {
 
-    @Autowired
-    private CourseMapper courseMapper;
+    private final CourseService courseService;
 
-    @Autowired
-    private CourseResourceMapper courseResourceMapper;
+    // ==================== 1. 课程管理接口 (RESTful 风格) ====================
 
-    @Value("${file.upload.path:uploads/}")
-    private String uploadPath;
-
-    // ==================== 课程管理接口 ====================
-
-    @GetMapping("/list")
-    public ResponseEntity<?> getCourseList(@RequestParam Long teacherId) {
-        List<Course> courses = courseMapper.selectByTeacherId(teacherId);
-        Map<String, Object> response = new HashMap<>();
-        response.put("code", 200);
-        response.put("data", courses);
-        return ResponseEntity.ok(response);
+    /**
+     * 获取课程列表（支持按教师 ID 筛选，留空则查全部）
+     */
+    @GetMapping
+    public ApiResponse<List<Course>> getCourses(@RequestParam(required = false) Long teacherId) {
+        List<Course> list = (teacherId != null)
+                ? courseService.getCoursesByTeacherId(teacherId)
+                : courseService.getAllCourses();
+        return ApiResponse.ok(list);
     }
 
-    @PostMapping("/add")
-    public ResponseEntity<?> addCourse(@RequestBody Course course) {
-        int result = courseMapper.insert(course);
-        Map<String, Object> response = new HashMap<>();
-        if (result > 0) {
-            response.put("code", 200);
-            response.put("msg", "课程创建成功");
-            response.put("data", course);
-        } else {
-            response.put("code", 500);
-            response.put("msg", "课程创建失败");
+    /**
+     * 根据课程 ID 获取详情
+     */
+    @GetMapping("/{id}")
+    public ApiResponse<Course> getCourseById(@PathVariable Long id) {
+        return courseService.getCourseById(id)
+                .map(ApiResponse::ok)
+                .orElse(ApiResponse.fail(404, "该课程不存在"));
+    }
+
+    /**
+     * 创建课程
+     */
+    @PostMapping
+    public ApiResponse<Course> createCourse(@RequestBody Course course) {
+        Course savedCourse = courseService.saveCourse(course);
+        return ApiResponse.ok("课程创建成功", savedCourse);
+    }
+
+    /**
+     * 更新课程
+     */
+    @PutMapping("/{id}")
+    public ApiResponse<Course> updateCourse(@PathVariable Long id, @RequestBody Course course) {
+        course.setId(id);
+        Course updatedCourse = courseService.saveCourse(course);
+        return ApiResponse.ok("课程更新成功", updatedCourse);
+    }
+
+    /**
+     * 删除课程
+     */
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteCourse(@PathVariable Long id) {
+        if (courseService.deleteCourse(id)) {
+            return ApiResponse.ok("课程删除成功", null);
         }
-        return ResponseEntity.ok(response);
+        return ApiResponse.fail(500, "课程删除失败或课程不存在");
     }
 
-    @PutMapping("/update")
-    public ResponseEntity<?> updateCourse(@RequestBody Course course) {
-        int result = courseMapper.update(course);
-        Map<String, Object> response = new HashMap<>();
-        if (result > 0) {
-            response.put("code", 200);
-            response.put("msg", "课程更新成功");
-        } else {
-            response.put("code", 500);
-            response.put("msg", "课程更新失败");
-        }
-        return ResponseEntity.ok(response);
+    // ==================== 2. 课程资源管理接口 ====================
+
+    /**
+     * 获取指定课程的资源列表
+     */
+    @GetMapping("/{courseId}/resources")
+    public ApiResponse<List<CourseResource>> getResourceList(@PathVariable Long courseId) {
+        List<CourseResource> resources = courseService.getResourcesByCourseId(courseId);
+        return ApiResponse.ok(resources);
     }
 
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<?> deleteCourse(@PathVariable Long id) {
-        int result = courseMapper.deleteById(id);
-        Map<String, Object> response = new HashMap<>();
-        if (result > 0) {
-            response.put("code", 200);
-            response.put("msg", "课程删除成功");
-        } else {
-            response.put("code", 500);
-            response.put("msg", "课程删除失败");
-        }
-        return ResponseEntity.ok(response);
-    }
-
-    // ==================== 课程资源管理接口 ====================
-
-    @GetMapping("/resource/list")
-    public ResponseEntity<?> getResourceList(@RequestParam Long courseId) {
-        List<CourseResource> resources = courseResourceMapper.selectByCourseId(courseId);
-        Map<String, Object> response = new HashMap<>();
-        response.put("code", 200);
-        response.put("data", resources);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/resource/upload")
-    public ResponseEntity<?> uploadResource(
+    /**
+     * 上传课程资源文件
+     */
+    @PostMapping("/resources/upload")
+    public ApiResponse<CourseResource> uploadResource(
             @RequestParam("file") MultipartFile file,
             @RequestParam Long courseId,
             @RequestParam String title) {
-        
-        Map<String, Object> response = new HashMap<>();
-        
+
         if (file.isEmpty()) {
-            response.put("code", 400);
-            response.put("msg", "文件不能为空");
-            return ResponseEntity.badRequest().body(response);
+            return ApiResponse.fail(400, "文件不能为空");
         }
 
         try {
-            // 使用绝对路径创建上传目录
-            String basePath = System.getProperty("user.dir");
-            File uploadDir = new File(basePath, uploadPath);
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
-
-            // 生成唯一文件名
-            String originalFilename = file.getOriginalFilename();
-            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            String newFilename = UUID.randomUUID().toString() + extension;
-            
-            // 保存文件
-            File destFile = new File(uploadDir, newFilename);
-            file.transferTo(destFile);
-
-            // 保存到数据库
-            CourseResource resource = new CourseResource();
-            resource.setCourseId(courseId);
-            resource.setTitle(title);
-            resource.setFileUrl("/uploads/" + newFilename);
-            resource.setSegmentStatus(0);
-            courseResourceMapper.insert(resource);
-
-            response.put("code", 200);
-            response.put("msg", "上传成功");
-            response.put("data", resource);
-            
+            CourseResource resource = courseService.uploadResource(file, courseId, title);
+            return ApiResponse.ok("上传成功", resource);
         } catch (IOException e) {
-            response.put("code", 500);
-            response.put("msg", "文件上传失败: " + e.getMessage());
+            return ApiResponse.fail(500, "文件上传失败: " + e.getMessage());
         }
-        
-        return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/resource/update")
-    public ResponseEntity<?> updateResource(@RequestBody CourseResource resource) {
-        int result = courseResourceMapper.update(resource);
-        Map<String, Object> response = new HashMap<>();
-        if (result > 0) {
-            response.put("code", 200);
-            response.put("msg", "资源更新成功");
-        } else {
-            response.put("code", 500);
-            response.put("msg", "资源更新失败");
+    /**
+     * 更新资源信息
+     */
+    @PutMapping("/resources")
+    public ApiResponse<Void> updateResource(@RequestBody CourseResource resource) {
+        if (courseService.updateResource(resource)) {
+            return ApiResponse.ok("资源更新成功", null);
         }
-        return ResponseEntity.ok(response);
+        return ApiResponse.fail(500, "资源更新失败");
     }
 
-    @DeleteMapping("/resource/delete/{id}")
-    public ResponseEntity<?> deleteResource(@PathVariable Long id) {
-        int result = courseResourceMapper.deleteById(id);
-        Map<String, Object> response = new HashMap<>();
-        if (result > 0) {
-            response.put("code", 200);
-            response.put("msg", "资源删除成功");
-        } else {
-            response.put("code", 500);
-            response.put("msg", "资源删除失败");
+    /**
+     * 删除指定资源
+     */
+    @DeleteMapping("/resources/{id}")
+    public ApiResponse<Void> deleteResource(@PathVariable Long id) {
+        if (courseService.deleteResource(id)) {
+            return ApiResponse.ok("资源删除成功", null);
         }
-        return ResponseEntity.ok(response);
+        return ApiResponse.fail(500, "资源删除失败");
     }
 }

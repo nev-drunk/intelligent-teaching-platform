@@ -1,17 +1,17 @@
 import request from './request'
 
 export function fetchCarousel() {
-  return request.get('/portal/carousel')
+  return request.get('/api/portal/carousel')
 }
 
 export function fetchNotices() {
-  return request.get('/portal/notices')
+  return request.get('/api/portal/notices')
 }
 
 export function publishNotice(data) {
-  return request.post('/portal/notices', data)
+  return request.post('/api/portal/notices', data)
 }
 
 export function deleteNotice(id) {
-  return request.delete(`/portal/notices/${id}`)
+  return request.delete(`/api/portal/notices/${id}`)
 }

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.SubmissionMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="SubmissionResultMap" type="com.huadi.intelligentteachingplatform.entity.Submission">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="student_id" property="studentId"/>
+        <result column="student_name" property="studentName"/>
+        <result column="submit_text" property="submitText"/>
+        <result column="file_url" property="fileUrl"/>
+        <result column="ocr_raw_text" property="ocrRawText"/>
+        <result column="ai_score" property="aiScore"/>
+        <result column="ai_comment" property="aiComment"/>
+        <result column="teacher_score" property="teacherScore"/>
+        <result column="teacher_comment" property="teacherComment"/>
+        <result column="status" property="status"/>
+        <result column="submit_time" property="submitTime"/>
+        <result column="task_title" property="taskTitle"/>
+        <result column="course_name" property="courseName"/>
+    </resultMap>
+
+    <!-- 分页查询提交列表（连表查询任务名称） -->
+    <select id="selectSubmissionsWithTaskInfo" resultMap="SubmissionResultMap">
+        SELECT 
+            s.id, 
+            s.task_id, 
+            s.student_id, 
+            st.student_name, 
+            s.submit_text, 
+            s.file_url, 
+            s.ocr_raw_text, 
+            s.ai_score, 
+            s.ai_comment,
+            s.teacher_score, 
+            s.teacher_comment, 
+            s.status, 
+            s.submit_time,
+            t.title as task_title,
+            c.course_name
+        FROM tb_submission s
+        LEFT JOIN tb_student st ON s.student_id = st.id
+        LEFT JOIN tb_task t ON s.task_id = t.id
+        LEFT JOIN tb_course c ON t.course_id = c.id
+        <where>
+            <if test="taskId != null">
+                AND s.task_id = #{taskId}
+            </if>
+        </where>
+        ORDER BY s.submit_time DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <!-- 统计提交数量 -->
+    <select id="countSubmissions" resultType="long">
+        SELECT COUNT(*)
+        FROM tb_submission s
+        <where>
+            <if test="taskId != null">
+                AND s.task_id = #{taskId}
+            </if>
+        </where>
+    </select>
+
+</mapper>

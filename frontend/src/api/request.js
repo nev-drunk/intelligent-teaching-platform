@@ -1,15 +1,22 @@
 import axios from 'axios'
 
 const request = axios.create({
-  baseURL: '/api',
-  timeout: 15000
+  baseURL: '',
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json;charset=UTF-8'
+  },
+  responseType: 'json',
+  responseEncoding: 'utf8'
 })
 
 request.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
-    config.headers.Authorization = token
+    // JWT Token 添加 Bearer 前缀
+    config.headers.Authorization = 'Bearer ' + token
   }
+  config.headers['Accept'] = 'application/json;charset=UTF-8'
   return config
 })
 

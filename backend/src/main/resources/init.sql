@@ -75,8 +75,11 @@ CREATE TABLE `tb_exam_paper` (
                                  `course_id` BIGINT NOT NULL COMMENT '所属课程ID',
                                  `title` VARCHAR(100) NOT NULL COMMENT '试卷名称',
                                  `total_score` INT DEFAULT '100' COMMENT '总分',
+                                 `class_id` BIGINT DEFAULT NULL COMMENT '发布目标班级ID',
+                                 `teacher_id` BIGINT DEFAULT NULL COMMENT '组卷教师ID',
                                  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                 PRIMARY KEY (`id`)
+                                 PRIMARY KEY (`id`),
+                                 KEY `idx_paper_teacher_course` (`teacher_id`, `course_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='试卷主表';
 
 DROP TABLE IF EXISTS `tb_paper_question`;
@@ -121,6 +124,7 @@ CREATE TABLE `tb_submission` (
     -- 算法核心字段
                                  `ocr_raw_text` TEXT COMMENT '💥[图像分类/OCR] 识别出来的试卷手写文本串',
                                  `ai_score` INT DEFAULT NULL COMMENT '💥[图像分类] AI针对客观题分类自动批改出的分数',
+                                 `ai_comment` TEXT COMMENT '💥[AI批改] AI生成的批改意见和反馈',
                                  `plagiarism_rate` DECIMAL(5,2) DEFAULT '0.00' COMMENT '💥[目标检测/文本查重] 抄袭痕迹检测概率 (0-100%)',
                                  `is_cheated` TINYINT DEFAULT '0' COMMENT '💥[目标检测] 是否判定违规作答/作弊: 0否, 1是',
                                  `ai_review_voice_url` VARCHAR(255) DEFAULT NULL COMMENT '💥[TTS算法] 教师文本评语转换后的语音播报文件路径',
@@ -140,9 +144,13 @@ DROP TABLE IF EXISTS `tb_questionnaire`;
 CREATE TABLE `tb_questionnaire` (
                                     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '问卷ID',
                                     `teacher_id` BIGINT NOT NULL COMMENT '发起调查的教师ID',
+                                    `class_id` BIGINT DEFAULT NULL COMMENT '目标班级ID',
+                                    `course_id` BIGINT DEFAULT NULL COMMENT '关联课程ID',
                                     `title` VARCHAR(150) NOT NULL COMMENT '问卷标题(如: 2026期中教学满意度调查)',
                                     `content_json` JSON NOT NULL COMMENT '问卷题目题干(以JSON数组格式存放各种量表题)',
                                     `status` TINYINT DEFAULT '1' COMMENT '状态: 0关闭, 1开启',
+                                    `response_count` INT DEFAULT '0' COMMENT '问卷填写人数统计',
+                                    `avg_score` DECIMAL(4,2) DEFAULT '0.00' COMMENT '问卷平均评分',
                                     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='问卷调查表';
@@ -152,7 +160,10 @@ CREATE TABLE `tb_evaluation_report` (
                                         `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '评价报告ID',
                                         `teacher_id` BIGINT NOT NULL COMMENT '被评价教师ID',
                                         `course_id` BIGINT NOT NULL COMMENT '关联课程ID',
+                                        `course_name` VARCHAR(100) COMMENT '课程名称',
+                                        `teacher_name` VARCHAR(50) COMMENT '教师姓名',
                                         `avg_satisfaction` DECIMAL(4,2) COMMENT '根据问卷汇总出的客观满意度得分',
+                                        `response_count` INT DEFAULT '0' COMMENT '问卷填写人数',
                                         `llm_analysis_report` TEXT COMMENT '💥[对话大模型] AI综合问卷、学生成绩、出勤率生成的教学效果诊断报告',
                                         `generate_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
                                         PRIMARY KEY (`id`)
@@ -165,6 +176,7 @@ DROP TABLE IF EXISTS `tb_issue_center`;
 CREATE TABLE `tb_issue_center` (
                                    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '提问ID',
                                    `course_id` BIGINT NOT NULL COMMENT '关联课程ID',
+                                   `student_id` BIGINT DEFAULT NULL COMMENT '提问学生ID',
                                    `student_name` VARCHAR(50) NOT NULL COMMENT '提问学生',
                                    `question_text` TEXT NOT NULL COMMENT '学生提问的问题内容',
                                    `ai_suggested_answer` TEXT COMMENT '💥[对话大模型] AI助教根据课程知识库自动秒回的建议参考答案',
@@ -186,10 +198,58 @@ CREATE TABLE `tb_portal_notice` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='网站门户通知公告表';
 
 -- ----------------------------
--- 8. 默认测试基础初始化数据
+-- 8. 学生表
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_student`;
+CREATE TABLE `tb_student` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '学生ID',
+    `student_name` VARCHAR(50) NOT NULL COMMENT '学生姓名',
+    `class_id` BIGINT NOT NULL COMMENT '所属班级ID',
+    `student_no` VARCHAR(20) DEFAULT NULL COMMENT '学号',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `fk_student_class` (`class_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生信息表';
+
+-- ----------------------------
+-- 9. 默认测试基础初始化数据
 -- ----------------------------
 INSERT INTO `tb_teacher` (`id`, `username`, `password`, `name`) VALUES (1, 'admin', '123456', '张教授');
 INSERT INTO `tb_class` (`id`, `class_name`, `teacher_id`) VALUES (1, '2024级软件工程1班', 1);
+INSERT INTO `tb_class` (`id`, `class_name`, `teacher_id`) VALUES (2, '2024级软件工程2班', 1);
 INSERT INTO `tb_course` (`id`, `course_name`, `teacher_id`, `description`) VALUES (1, '大模型应用与微调技术', 1, '本课程讲授深度学习、大模型接口调用及提示词工程。');
+
+-- 学生数据
+INSERT INTO `tb_student` (`id`, `student_name`, `class_id`, `student_no`) VALUES 
+(1, '李明', 1, '2024001'),
+(2, '王小红', 1, '2024002'),
+(3, '张伟', 1, '2024003'),
+(4, '刘芳', 2, '2024004'),
+(5, '陈强', 2, '2024005');
+
+-- 任务数据
+INSERT INTO `tb_task` (`id`, `course_id`, `class_id`, `title`, `type`, `content_text`, `deadline`) VALUES 
+(1, 1, 1, '第一次编程作业', 'HOMEWORK', '完成Transformer架构实现', '2026-05-25 23:59:59'),
+(2, 1, 1, '第二次编程作业', 'HOMEWORK', '实现提示词工程案例', '2026-05-30 23:59:59'),
+(3, 1, 2, '第三次编程作业', 'HOMEWORK', '微调技术实验', '2026-06-05 23:59:59');
+
+-- 学生提交数据
+INSERT INTO `tb_submission` (`id`, `task_id`, `student_id`, `student_name`, `submit_text`, `status`, `submit_time`) VALUES 
+(1, 1, 1, '李明', '已完成Transformer架构实现，代码见附件', 'SUBMITTED', '2026-05-20 14:30:00'),
+(2, 2, 2, '王小红', '提示词工程案例已完成', 'SUBMITTED', '2026-05-18 09:15:00'),
+(3, 3, 3, '张伟', '微调技术实验报告', 'SUBMITTED', '2026-05-15 16:45:00');
+
+-- 题库初始化数据
+INSERT INTO `tb_question` (`id`, `course_id`, `type`, `content`, `options`, `answer`, `is_llm_generated`) VALUES 
+(1, 1, 'SINGLE', '什么是牛顿第一定律？', '["A. 物体保持静止或匀速直线运动状态", "B. 力是改变物体运动状态的原因", "C. 作用力与反作用力相等", "D. 加速度与力成正比"]', 'A', 0),
+(2, 1, 'SINGLE', '勾股定理的公式是什么？', '["A. a + b = c", "B. a² + b² = c²", "C. a - b = c", "D. a × b = c"]', 'B', 0),
+(3, 1, 'JUDGE', '水的化学式是 H₂O', NULL, '正确', 0),
+(4, 1, 'MULTI', '以下哪些是深度学习框架？', '["A. TensorFlow", "B. PyTorch", "C. Vue", "D. Keras"]', 'ABD', 1),
+(5, 1, 'GAP', 'Transformer模型的核心机制是____', NULL, '注意力机制', 0);
+
+-- 教学评价报告初始化数据
+INSERT INTO `tb_evaluation_report` (`id`, `teacher_id`, `course_id`, `avg_satisfaction`, `llm_analysis_report`, `generate_time`) VALUES 
+(1, 1, 1, 87.50, '【教学效果诊断报告】\n\n📊 数据概览：\n本次评价满意度得分 87.50 分，整体处于优秀水平。\n\n✅ 教学亮点：\n1. 教师授课态度认真负责，教学准备充分\n2. 课程内容覆盖全面，理论与实践结合紧密\n3. 课后作业设计合理，能有效巩固知识点\n\n⚠️ 存在问题：\n1. 课堂互动环节偏少，学生主动参与率有待提高\n2. 部分难点讲解速度偏快，基础薄弱学生跟不上\n\n💡 改进建议：\n1. 增加课堂小组讨论和随堂测试环节\n2. 针对难点录制微课视频供学生反复观看', '2026-05-20 10:00:00'),
+(2, 1, 1, 82.30, NULL, '2026-05-15 14:30:00');
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.huadi.intelligentteachingplatform.mapper.EvaluationReportMapper">
+
+    <resultMap id="BaseResultMap" type="com.huadi.intelligentteachingplatform.entity.EvaluationReport">
+        <id column="id" property="id"/>
+        <result column="teacher_id" property="teacherId"/>
+        <result column="course_id" property="courseId"/>
+        <result column="course_name" property="courseName"/>
+        <result column="teacher_name" property="teacherName"/>
+        <result column="avg_satisfaction" property="avgSatisfaction"/>
+        <result column="response_count" property="responseCount"/>
+        <result column="llm_analysis_report" property="llmAnalysisReport"/>
+        <result column="generate_time" property="generateTime"/>
+    </resultMap>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT id, teacher_id, course_id, course_name, teacher_name, avg_satisfaction, response_count, llm_analysis_report, generate_time
+        FROM tb_evaluation_report
+        <where>
+            <if test="teacherId != null">
+                teacher_id = #{teacherId}
+            </if>
+        </where>
+        ORDER BY generate_time DESC
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT id, teacher_id, course_id, course_name, teacher_name, avg_satisfaction, response_count, llm_analysis_report, generate_time
+        FROM tb_evaluation_report
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.huadi.intelligentteachingplatform.entity.EvaluationReport"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_evaluation_report (teacher_id, course_id, course_name, teacher_name, avg_satisfaction, response_count, llm_analysis_report)
+        VALUES (#{teacherId}, #{courseId}, #{courseName}, #{teacherName}, #{avgSatisfaction}, #{responseCount}, #{llmAnalysisReport})
+    </insert>
+
+    <update id="update" parameterType="com.huadi.intelligentteachingplatform.entity.EvaluationReport">
+        UPDATE tb_evaluation_report
+        SET course_name = #{courseName},
+            teacher_name = #{teacherName},
+            avg_satisfaction = #{avgSatisfaction},
+            response_count = #{responseCount},
+            llm_analysis_report = #{llmAnalysisReport}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM tb_evaluation_report WHERE id = #{id}
+    </delete>
+
+    <update id="updateAiReport">
+        UPDATE tb_evaluation_report
+        SET llm_analysis_report = #{llmAnalysisReport}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

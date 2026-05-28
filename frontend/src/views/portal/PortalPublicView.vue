@@ -61,7 +61,7 @@ function playNotice(notice) {
   const utterance = new SpeechSynthesisUtterance(text)
   const voices = window.speechSynthesis.getVoices()
   if (voices.length > 0) {
-    utterance.voice = voices.find(v => v.lang.includes('zh')) || voices[0]
+    utterance.voice = voices.find((v) => v.lang.includes('zh')) || voices[0]
   }
   utterance.onend = () => {
     isSpeaking.value = false
@@ -129,9 +129,9 @@ onUnmounted(() => {
           <p class="content">{{ n.content }}</p>
           <div class="notice-footer">
             <span class="meta">{{ n.createTime }}</span>
-            <button 
-              type="button" 
-              class="speak-btn" 
+            <button
+              type="button"
+              class="speak-btn"
               :class="{ speaking: speakingId === n.id && isSpeaking }"
               @click="playNotice(n)"
             >
@@ -153,7 +153,12 @@ onUnmounted(() => {
 }
 
 .portal-header {
-  background: linear-gradient(135deg, #003A8C 0%, var(--color-primary) 50%, var(--color-primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    #003a8c 0%,
+    var(--color-primary) 50%,
+    var(--color-primary-light) 100%
+  );
   color: #ffffff;
   padding: 56px 24px;
   text-align: center;
@@ -165,7 +170,7 @@ onUnmounted(() => {
   font-size: 32px;
   font-weight: 700;
   letter-spacing: 2px;
-  background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.85) 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #3b82f6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -173,9 +178,11 @@ onUnmounted(() => {
 
 .portal-header p {
   margin: 0;
-  opacity: 0.92;
-  font-size: 14px;
+  color: #60a5fa;
+  font-size: 15px;
   letter-spacing: 1px;
+  font-weight: 500;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .admin-entry {
@@ -184,21 +191,20 @@ onUnmounted(() => {
   justify-content: center;
   margin-top: 24px;
   padding: 12px 32px;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(10px);
-  color: #ffffff;
+  background: #ffffff;
+  color: #003a8c;
   border-radius: 24px;
   text-decoration: none;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .admin-entry:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #f0f4ff;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 58, 140, 0.35);
 }
 
 .carousel {
@@ -240,8 +246,9 @@ onUnmounted(() => {
 
 .slide p {
   margin: 0;
-  opacity: 0.92;
+  color: #e0e7ff;
   font-size: 15px;
+  font-weight: 500;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
@@ -360,8 +367,13 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .empty,

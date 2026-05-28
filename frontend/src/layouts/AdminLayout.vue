@@ -7,15 +7,89 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const menuItems = [
-  { path: '/admin/portal', label: '网站门户系统', icon: '🌐' },
-  { path: '/admin/classes', label: '班级管理', icon: '📚' },
-  { path: '/admin/homework-comments', label: '作业评语', icon: '✏️' },
-  { path: '/admin/teaching-notifications', label: '教学通知', icon: '📢' },
-  { path: '/admin/dashboard', label: '工作台', icon: '📋' }
+const menuGroups = [
+  {
+    title: '教学管理',
+    items: [
+      {
+        path: '/admin/courses',
+        label: '课程管理',
+        match: (p) => p.startsWith('/admin/courses')
+      },
+      {
+        path: '/admin/classes',
+        label: '班级管理',
+        match: (p) => p.startsWith('/admin/classes')
+      },
+      {
+        path: '/admin/student',
+        label: '学生管理',
+        match: (p) => p.startsWith('/admin/student')
+      }
+    ]
+  },
+  {
+    title: '教学工作',
+    items: [
+      {
+        path: '/admin/exam/questions',
+        label: '题库与组卷',
+        match: (p) => p.startsWith('/admin/exam')
+      },
+      {
+        path: '/admin/homework-comments',
+        label: '作业评语',
+        match: (p) => p.startsWith('/admin/homework-comments')
+      },
+      {
+        path: '/admin/submission',
+        label: '作业批改',
+        match: (p) => p.startsWith('/admin/submission')
+      },
+      {
+        path: '/admin/teaching-notifications',
+        label: '教学通知',
+        match: (p) => p.startsWith('/admin/teaching-notifications')
+      },
+      {
+        path: '/admin/questionnaire',
+        label: '问卷调查',
+        match: (p) => p.startsWith('/admin/questionnaire')
+      },
+      {
+        path: '/admin/issue-center',
+        label: '问题中心',
+        match: (p) => p.startsWith('/admin/issue-center')
+      },
+      {
+        path: '/admin/evaluation',
+        label: '教学评价',
+        match: (p) => p.startsWith('/admin/evaluation')
+      }
+    ]
+  },
+  {
+    title: '系统功能',
+    items: [
+      {
+        path: '/admin/portal',
+        label: '网站门户',
+        match: (p) => p.startsWith('/admin/portal')
+      }
+    ]
+  }
 ]
 
-const activePath = computed(() => route.path)
+const pageTitle = computed(() => {
+  const matched = [...route.matched].reverse()
+  const examChild = matched.find((r) => r.meta?.title && r.path.includes('exam'))
+  const any = matched.find((r) => r.meta?.title)
+  return examChild?.meta?.title || any?.meta?.title || '后台管理'
+})
+
+function isActive(item) {
+  return item.match(route.path)
+}
 
 function logout() {
   auth.logout()
@@ -27,35 +101,47 @@ function logout() {
   <div class="admin-shell">
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-icon">🎓</span>
         <div>
           <h1>教师中心</h1>
           <p>智能教学支持平台</p>
         </div>
       </div>
       <nav class="menu">
-        <router-link
-          v-for="item in menuItems"
-          :key="item.path"
-          :to="item.path"
-          class="menu-item"
-          :class="{ active: activePath.startsWith(item.path) }"
-        >
-          <span class="menu-icon">{{ item.icon }}</span>
-          {{ item.label }}
-        </router-link>
+        <div v-for="group in menuGroups" :key="group.title" class="menu-group">
+          <div class="group-title">{{ group.title }}</div>
+          <router-link
+            v-for="item in group.items"
+            :key="item.path"
+            :to="item.path"
+            class="menu-item"
+            :class="{ active: isActive(item) }"
+          >
+            {{ item.label }}
+          </router-link>
+        </div>
       </nav>
       <div class="user-box">
         <p class="user-name">{{ auth.name || '教师' }}</p>
         <p class="user-meta">@{{ auth.username }}</p>
-        <button type="button" class="logout-btn" @click="logout">退出登录</button>
+        <button type="button" class="btn btn--ghost btn--danger" @click="logout">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M19 12H7"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          退出登录
+        </button>
       </div>
     </aside>
     <main class="main-area">
       <header class="top-bar">
-        <h2>{{ route.meta.title || '后台管理' }}</h2>
+        <h2>{{ pageTitle }}</h2>
       </header>
-      <section class="content">
+      <section class="content" :class="{ 'content--exam': route.path.startsWith('/admin/exam') }">
         <RouterView />
       </section>
     </main>
@@ -66,59 +152,75 @@ function logout() {
 .admin-shell {
   display: flex;
   min-height: 100vh;
-  background: var(--color-bg-page);
+  background: var(--bg-page);
 }
 
 .sidebar {
-  width: 256px;
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
+  width: 260px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  margin: 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.04);
 }
 
 .brand {
   display: flex;
+  align-items: center;
   gap: 12px;
   padding: 24px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .brand-icon {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-  border-radius: var(--radius-md);
-  color: #ffffff;
-  font-size: 20px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  border-radius: var(--radius-lg);
+  font-size: 22px;
+  box-shadow: 0 4px 14px var(--primary-glow);
 }
 
 .brand h1 {
-  margin: 0;
   font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  letter-spacing: 0.3px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .brand p {
-  margin: 3px 0 0;
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
+  margin: 2px 0 0;
 }
 
 .menu {
   flex: 1;
-  padding: 16px 12px;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.menu-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 8px 16px 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .menu-item {
@@ -127,110 +229,120 @@ function logout() {
   gap: 12px;
   padding: 12px 16px;
   border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
+  color: var(--text-primary);
   text-decoration: none;
   font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.menu-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 0;
-  background: var(--color-primary);
-  border-radius: 0 3px 3px 0;
-  transition: height 0.25s ease;
+  font-weight: 600;
+  transition: all 0.15s ease;
 }
 
 .menu-item:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: var(--bg-hover);
+  color: var(--primary);
 }
 
 .menu-item.active {
-  background: rgba(22, 93, 255, 0.08);
-  color: var(--color-primary);
+  background: var(--primary-light);
+  color: var(--primary);
   font-weight: 600;
-}
-
-.menu-item.active::before {
-  height: 60%;
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .menu-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18px;
-  opacity: 0.8;
 }
 
 .user-box {
-  padding: 20px 24px 24px;
-  border-top: 1px solid var(--color-border-light);
-  background: var(--color-bg-hover);
-  border-radius: 0 0 var(--radius-xl) 0;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-light);
+  margin-top: auto;
 }
 
 .user-name {
-  margin: 0;
-  font-weight: 600;
-  color: var(--color-text-primary);
   font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .user-meta {
-  margin: 4px 0 12px;
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
+  margin: 4px 0 12px;
 }
 
-.logout-btn {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 13px;
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  border: none;
 }
 
-.logout-btn:hover {
-  background: rgba(245, 63, 63, 0.08);
-  border-color: rgba(245, 63, 63, 0.3);
-  color: var(--color-danger);
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.btn--ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.btn--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn--danger:hover {
+  background: #fef2f2;
+  border-color: var(--danger);
 }
 
 .main-area {
   flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 16px;
   min-width: 0;
 }
 
 .top-bar {
-  padding: 20px 32px;
-  background: var(--color-bg-card);
-  border-bottom: 1px solid var(--color-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
 }
 
 .top-bar h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary);
 }
 
 .content {
   flex: 1;
-  padding: 28px 32px;
   overflow: auto;
+}
+
+.content--exam {
+  padding: 0;
 }
 </style>
