@@ -150,9 +150,47 @@ const closeModal = () => {
 }
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN')
+  // 1️⃣ 空值检查
+  if (dateStr === null || dateStr === undefined || dateStr === '' || dateStr === 'null') {
+    return '-'
+  }
+
+  try {
+    // 2️⃣ 兼容 Java LocalDateTime 默认序列化出来的 [2026, 5, 29, 10, 30] 数组坑
+    if (Array.isArray(dateStr)) {
+      if (dateStr.length >= 3) {
+        const y = dateStr[0]
+        const m = String(dateStr[1]).padStart(2, '0')
+        const d = String(dateStr[2]).padStart(2, '0')
+        return `${y}/${m}/${d}`
+      }
+      return '-'
+    }
+
+    let date
+
+    // 3️⃣ 判断是否是纯数字（时间戳）
+    if (!isNaN(dateStr) && !isNaN(parseFloat(dateStr))) {
+      date = new Date(Number(dateStr))
+    } else if (typeof dateStr === 'string') {
+      // 4️⃣ 处理带有 'T' 且可能带毫秒尾巴的 ISO 字符串
+      const safeStr = dateStr.replace('T', ' ').split('.')[0]
+      date = new Date(safeStr)
+    } else {
+      date = new Date(dateStr)
+    }
+
+    // 5️⃣ 如果解析出来是 Invalid Date，保底把后端原样字符串丢出来，拒绝丑陋的 Invalid Date
+    if (date.toString() === 'Invalid Date') {
+      return String(dateStr)
+    }
+
+    // 6️⃣ 成功解析，格式化输出
+    return date.toLocaleDateString('zh-CN')
+  } catch (error) {
+    console.error('课程列表时间解析出错:', error)
+    return String(dateStr)
+  }
 }
 
 onMounted(fetchCourses)

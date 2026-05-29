@@ -2,9 +2,7 @@
   <div class="resource-page">
     <div class="page-header">
       <div class="header-left">
-        <button class="btn-back" @click="goBack">
-          <span>&larr;</span> 返回课程列表
-        </button>
+        <button class="btn-back" @click="goBack"><span>&larr;</span> 返回课程列表</button>
         <h1 class="page-title">课程资源管理</h1>
       </div>
       <button class="btn-primary" @click="showUploadModal = true">
@@ -33,7 +31,10 @@
               <td class="cell-highlight">{{ res.title }}</td>
               <td class="cell-filename">{{ res.fileUrl }}</td>
               <td>
-                <span class="status-badge" :class="res.segmentStatus === 1 ? 'status-done' : 'status-pending'">
+                <span
+                  class="status-badge"
+                  :class="res.segmentStatus === 1 ? 'status-done' : 'status-pending'"
+                >
                   {{ res.segmentStatus === 1 ? '已处理' : '未处理' }}
                 </span>
               </td>
@@ -52,7 +53,6 @@
       </div>
     </div>
 
-    <!-- 上传资源弹窗 -->
     <div v-if="showUploadModal" class="modal-overlay" @click.self="closeUploadModal">
       <div class="modal-card">
         <div class="modal-header">
@@ -66,8 +66,19 @@
           </div>
           <div class="form-group">
             <label>选择文件 <span class="required">*</span></label>
-            <div class="upload-area" @click="triggerFileInput" @drop.prevent="handleDrop" @dragover.prevent>
-              <input ref="fileInput" type="file" style="display: none" @change="handleFileChange" accept=".ppt,.pptx,.pdf,.mp4,.jpg,.png" />
+            <div
+              class="upload-area"
+              @click="triggerFileInput"
+              @drop.prevent="handleDrop"
+              @dragover.prevent
+            >
+              <input
+                ref="fileInput"
+                type="file"
+                style="display: none"
+                @change="handleFileChange"
+                accept=".ppt,.pptx,.pdf,.mp4,.jpg,.png"
+              />
               <div v-if="!selectedFile" class="upload-placeholder">
                 <div class="upload-icon">&#128193;</div>
                 <p>点击或拖拽文件到此处上传</p>
@@ -93,7 +104,6 @@
       </div>
     </div>
 
-    <!-- 图像分割弹窗 -->
     <div v-if="showCropModal" class="modal-overlay" @click.self="closeCropModal">
       <div class="modal-card modal-large">
         <div class="modal-header">
@@ -146,11 +156,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
 import 'vue-cropper/dist/index.css'
 import { VueCropper } from 'vue-cropper'
+// 📌 引入你之前封装好的统一模块（请确保路径与你实际文件存放路径一致）
+import courseApi from '@/api/course'
 
 const route = useRoute()
 const router = useRouter()
@@ -170,14 +181,20 @@ const previewUrl = ref('')
 const currentResource = ref(null)
 const cropperKey = ref(0)
 
+// 1️⃣ 获取资源列表
+// 1️⃣ 获取资源列表
 const fetchResources = async () => {
   try {
-    const res = await axios.get(`/api/course/resource/list?courseId=${courseId}`)
-    if (res.data.code === 200) {
-      resources.value = res.data.data
+    const res = await courseApi.getResourceList(courseId)
+    // 💡 显式获取 res 里面的 data 数组
+    if (res && res.code === 200) {
+      resources.value = res.data || []
+    } else {
+      resources.value = res || [] // 兼容防错
     }
   } catch (err) {
     console.error('获取资源列表失败', err)
+    alert(err.message || '获取资源列表失败')
   }
 }
 
@@ -195,6 +212,7 @@ const handleDrop = (e) => {
   if (file) selectedFile.value = file
 }
 
+// 2️⃣ 上传资源文件
 const handleUpload = async () => {
   if (!uploadForm.value.title.trim()) {
     alert('请输入资源名称')
@@ -206,49 +224,38 @@ const handleUpload = async () => {
   }
 
   uploading.value = true
-  const formData = new FormData()
-  formData.append('file', selectedFile.value)
-  formData.append('courseId', courseId)
-  formData.append('title', uploadForm.value.title)
 
   try {
-    const res = await axios.post('/api/course/resource/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    if (res.data.code === 200) {
-      closeUploadModal()
-      fetchResources()
-    } else {
-      alert(res.data.msg)
-    }
+    // 调用封装好的上传接口，不再使用零散的全局 axios
+    await courseApi.uploadResource(selectedFile.value, courseId, uploadForm.value.title)
+    alert('上传成功')
+    closeUploadModal()
+    fetchResources()
   } catch (err) {
     console.error('上传失败', err)
-    alert('上传失败')
+    alert(err.message || '上传失败')
   } finally {
     uploading.value = false
   }
 }
 
+// 3️⃣ 删除特定资源
 const handleDelete = async (id) => {
   if (!confirm('确定要删除这个资源吗？')) return
   try {
-    const res = await axios.delete(`/api/course/resource/delete/${id}`)
-    if (res.data.code === 200) {
-      fetchResources()
-    } else {
-      alert(res.data.msg)
-    }
+    await courseApi.deleteResource(id)
+    alert('删除成功')
+    fetchResources()
   } catch (err) {
     console.error('删除失败', err)
-    alert('删除失败')
+    alert(err.message || '删除失败')
   }
 }
 
 const handleCrop = (res) => {
   currentResource.value = res
-  // 构建完整图片URL（这里假设上传的是图片）
   cropImageUrl.value = 'http://localhost:8081' + res.fileUrl
-  cropperKey.value++ // 强制重新渲染cropper组件
+  cropperKey.value++
   showCropModal.value = true
   previewUrl.value = ''
 }
@@ -268,30 +275,32 @@ const resetCrop = () => {
   previewUrl.value = ''
 }
 
+// 4️⃣ 保存图像分割结果
 const saveCropResult = async () => {
   if (!previewUrl.value) {
     alert('请先进行裁剪')
     return
   }
-  // 更新资源的分割状态
+
   try {
     const updateData = {
       id: currentResource.value.id,
       courseId: currentResource.value.courseId,
       title: currentResource.value.title,
       fileUrl: currentResource.value.fileUrl,
-      segmentStatus: 1,
+      segmentStatus: 1, // 成功传给后端 1
       segmentedRegions: JSON.stringify({ cropped: true, time: new Date().toISOString() })
     }
-    const res = await axios.put('/api/course/resource/update', updateData)
-    if (res.data.code === 200) {
-      alert('分割结果已保存')
-      closeCropModal()
-      fetchResources()
-    }
+
+    // 发送更新请求
+    await courseApi.updateResource(updateData)
+
+    alert('分割结果已保存')
+    closeCropModal()
+    await fetchResources() // 重新获取列表，刷新状态标签
   } catch (err) {
     console.error('保存失败', err)
-    alert('保存失败')
+    alert(err.message || '保存失败')
   }
 }
 
@@ -313,11 +322,46 @@ const goBack = () => {
 }
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN')
-}
+  // 1️⃣ 严格空值校验：如果没有时间，直接安全返回横线，不让后续报错
+  if (dateStr === null || dateStr === undefined || dateStr === '' || dateStr === 'null') {
+    return '-'
+  }
 
+  try {
+    // 2️⃣ 特殊兼容：Java LocalDateTime 序列化出来的数组格式 [2026, 5, 29, 10, 30]
+    if (Array.isArray(dateStr)) {
+      if (dateStr.length >= 3) {
+        return `${dateStr[0]}/${dateStr[1]}/${dateStr[2]}`
+      }
+      return '-'
+    }
+
+    let date
+
+    // 3️⃣ 判断是否是纯数字（时间戳，如 1717000000000）
+    if (!isNaN(dateStr) && !isNaN(parseFloat(dateStr))) {
+      date = new Date(Number(dateStr))
+    } else if (typeof dateStr === 'string') {
+      // 4️⃣ 处理带有 'T' 的 ISO 字符串，剔除可能导致旧浏览器报错的毫秒尾巴
+      const safeStr = dateStr.replace('T', ' ').split('.')[0]
+      date = new Date(safeStr)
+    } else {
+      date = new Date(dateStr)
+    }
+
+    // 5️⃣ 如果解析出来是 Invalid Date，保底原样转换为字符串返回，绝不抛出错误
+    if (date.toString() === 'Invalid Date') {
+      return String(dateStr)
+    }
+
+    // 6️⃣ 成功解析，格式化输出：年/月/日
+    return date.toLocaleDateString('zh-CN')
+  } catch (error) {
+    // 7️⃣ 兜底捕获：哪怕中间发生任何报错，也静默吃掉，原样返回，确保页面绝不崩溃
+    console.error('时间解析发生意外错误，已拦截:', error)
+    return typeof dateStr === 'object' ? JSON.stringify(dateStr) : String(dateStr)
+  }
+}
 const formatFileSize = (size) => {
   if (size < 1024) return size + ' B'
   if (size < 1024 * 1024) return (size / 1024).toFixed(2) + ' KB'
@@ -328,23 +372,21 @@ onMounted(fetchResources)
 </script>
 
 <style scoped>
+/* 保持原样式不变，此处省略 */
 .resource-page {
   padding: 24px;
 }
-
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
 }
-
 .header-left {
   display: flex;
   align-items: center;
   gap: 16px;
 }
-
 .btn-back {
   background: #f5f7fa;
   color: #606266;
@@ -358,18 +400,15 @@ onMounted(fetchResources)
   gap: 6px;
   transition: all 0.3s ease;
 }
-
 .btn-back:hover {
   background: #e4e7ed;
 }
-
 .page-title {
   font-size: 24px;
   font-weight: 700;
   color: #2c3e50;
   margin: 0;
 }
-
 .btn-primary {
   background: linear-gradient(135deg, #409eff, #66b1ff);
   color: #fff;
@@ -384,18 +423,15 @@ onMounted(fetchResources)
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
 }
-
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(64, 158, 255, 0.4);
 }
-
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
-
 .btn-secondary {
   background: #f5f7fa;
   color: #606266;
@@ -406,18 +442,15 @@ onMounted(fetchResources)
   cursor: pointer;
   transition: all 0.3s ease;
 }
-
 .btn-secondary:hover {
   background: #e4e7ed;
 }
-
 .card {
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
-
 .card-header {
   padding: 20px 24px;
   border-bottom: 1px solid #f0f0f0;
@@ -425,27 +458,22 @@ onMounted(fetchResources)
   justify-content: space-between;
   align-items: center;
 }
-
 .card-title {
   font-size: 16px;
   font-weight: 600;
   color: #2c3e50;
 }
-
 .card-subtitle {
   font-size: 13px;
   color: #909399;
 }
-
 .table-wrapper {
   padding: 0;
 }
-
 .data-table {
   width: 100%;
   border-collapse: collapse;
 }
-
 .data-table th {
   background: #fafbfc;
   padding: 14px 24px;
@@ -455,24 +483,20 @@ onMounted(fetchResources)
   color: #606266;
   border-bottom: 1px solid #f0f0f0;
 }
-
 .data-table td {
   padding: 14px 24px;
   font-size: 14px;
   color: #4a5568;
   border-bottom: 1px solid #f6f7f9;
 }
-
 .data-table tbody tr:hover {
   background: #f5f9ff;
   transition: background 0.2s ease;
 }
-
 .cell-highlight {
   font-weight: 600;
   color: #2c3e50;
 }
-
 .cell-filename {
   color: #909399;
   font-size: 13px;
@@ -481,7 +505,6 @@ onMounted(fetchResources)
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .status-badge {
   display: inline-block;
   padding: 4px 10px;
@@ -489,22 +512,18 @@ onMounted(fetchResources)
   font-size: 12px;
   font-weight: 500;
 }
-
 .status-pending {
   background: #fdf6ec;
   color: #e6a23c;
 }
-
 .status-done {
   background: #f0f9eb;
   color: #67c23a;
 }
-
 .cell-actions {
   display: flex;
   gap: 12px;
 }
-
 .btn-text {
   background: none;
   border: none;
@@ -514,38 +533,29 @@ onMounted(fetchResources)
   border-radius: 4px;
   transition: all 0.2s ease;
 }
-
 .btn-edit {
   color: #409eff;
 }
-
 .btn-edit:hover {
   background: rgba(64, 158, 255, 0.1);
 }
-
 .btn-danger {
   color: #f56c6c;
 }
-
 .btn-danger:hover {
   background: rgba(245, 108, 108, 0.1);
 }
-
 .btn-info {
   color: #67c23a;
 }
-
 .btn-info:hover {
   background: rgba(103, 194, 58, 0.1);
 }
-
 .cell-empty {
   text-align: center;
   color: #909399;
   padding: 40px;
 }
-
-/* 弹窗样式 */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -556,7 +566,6 @@ onMounted(fetchResources)
   z-index: 1000;
   backdrop-filter: blur(4px);
 }
-
 .modal-card {
   background: #fff;
   border-radius: 16px;
@@ -565,11 +574,9 @@ onMounted(fetchResources)
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.15);
   animation: modalIn 0.3s ease;
 }
-
 .modal-large {
   width: 900px;
 }
-
 @keyframes modalIn {
   from {
     opacity: 0;
@@ -580,7 +587,6 @@ onMounted(fetchResources)
     transform: translateY(0) scale(1);
   }
 }
-
 .modal-header {
   padding: 20px 24px;
   border-bottom: 1px solid #f0f0f0;
@@ -588,14 +594,12 @@ onMounted(fetchResources)
   justify-content: space-between;
   align-items: center;
 }
-
 .modal-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: #2c3e50;
 }
-
 .btn-close {
   background: none;
   border: none;
@@ -604,19 +608,15 @@ onMounted(fetchResources)
   cursor: pointer;
   line-height: 1;
 }
-
 .btn-close:hover {
   color: #606266;
 }
-
 .modal-body {
   padding: 24px;
 }
-
 .form-group {
   margin-bottom: 20px;
 }
-
 .form-group label {
   display: block;
   margin-bottom: 8px;
@@ -624,11 +624,9 @@ onMounted(fetchResources)
   font-weight: 500;
   color: #4a5568;
 }
-
 .required {
   color: #f56c6c;
 }
-
 .form-group input {
   width: 100%;
   padding: 10px 14px;
@@ -640,15 +638,12 @@ onMounted(fetchResources)
   transition: all 0.3s ease;
   box-sizing: border-box;
 }
-
 .form-group input:focus {
   outline: none;
   border-color: #409eff;
   background: #fff;
   box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.15);
 }
-
-/* 上传区域 */
 .upload-area {
   border: 2px dashed #dcdfe6;
   border-radius: 12px;
@@ -658,56 +653,46 @@ onMounted(fetchResources)
   transition: all 0.3s ease;
   background: #fafbfc;
 }
-
 .upload-area:hover {
   border-color: #409eff;
   background: #f5f9ff;
 }
-
 .upload-placeholder .upload-icon {
   font-size: 48px;
   margin-bottom: 12px;
 }
-
 .upload-placeholder p {
   font-size: 15px;
   color: #4a5568;
   margin: 0 0 8px;
 }
-
 .upload-hint {
   font-size: 12px;
   color: #909399;
 }
-
 .upload-file-info {
   display: flex;
   align-items: center;
   gap: 16px;
   text-align: left;
 }
-
 .file-icon {
   font-size: 36px;
 }
-
 .file-detail {
   flex: 1;
 }
-
 .file-name {
   font-size: 14px;
   font-weight: 600;
   color: #2c3e50;
   margin: 0 0 4px;
 }
-
 .file-size {
   font-size: 12px;
   color: #909399;
   margin: 0;
 }
-
 .btn-remove-file {
   background: none;
   border: none;
@@ -715,11 +700,9 @@ onMounted(fetchResources)
   color: #909399;
   cursor: pointer;
 }
-
 .btn-remove-file:hover {
   color: #f56c6c;
 }
-
 .modal-footer {
   padding: 16px 24px;
   border-top: 1px solid #f0f0f0;
@@ -727,14 +710,11 @@ onMounted(fetchResources)
   justify-content: flex-end;
   gap: 12px;
 }
-
-/* 裁剪区域 */
 .crop-body {
   display: flex;
   gap: 24px;
   padding: 24px;
 }
-
 .crop-wrapper {
   flex: 1;
   min-height: 400px;
@@ -742,12 +722,10 @@ onMounted(fetchResources)
   border-radius: 12px;
   overflow: hidden;
 }
-
 .cropper-box {
   width: 100%;
   height: 400px;
 }
-
 .cropper-empty {
   width: 100%;
   height: 400px;
@@ -757,21 +735,18 @@ onMounted(fetchResources)
   color: #909399;
   font-size: 14px;
 }
-
 .crop-preview {
   width: 240px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
 .crop-preview h4 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #4a5568;
 }
-
 .preview-box {
   flex: 1;
   background: #f5f7fa;
@@ -782,23 +757,19 @@ onMounted(fetchResources)
   overflow: hidden;
   min-height: 200px;
 }
-
 .preview-box img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
-
 .preview-empty {
   color: #909399;
   font-size: 13px;
 }
-
 .crop-actions {
   display: flex;
   gap: 10px;
 }
-
 .crop-actions .btn-secondary,
 .crop-actions .btn-primary {
   flex: 1;
