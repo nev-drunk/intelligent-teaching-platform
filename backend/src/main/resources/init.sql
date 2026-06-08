@@ -46,7 +46,7 @@ CREATE TABLE `tb_course_resource` (
                                       `title` VARCHAR(150) NOT NULL COMMENT '资源名称(如：课件PPT/教学视频)',
                                       `file_url` VARCHAR(255) NOT NULL COMMENT '原始文件存储路径',
                                       `segment_status` TINYINT DEFAULT '0' COMMENT '图像分割状态: 0未处理, 1已切图提取关键内容',
-                                      `segmented_regions` JSON DEFAULT NULL COMMENT '💥[图像分割算法] 存储课件图片分割后的关键区域坐标及文字',
+                                      `segmented_regions` TEXT COMMENT '💥[图像分割算法] 存储课件图片分割后的关键区域坐标及文字',
                                       `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                                       PRIMARY KEY (`id`),
                                       KEY `fk_res_course` (`course_id`)
@@ -61,7 +61,7 @@ CREATE TABLE `tb_question` (
                                `course_id` BIGINT NOT NULL COMMENT '所属课程ID',
                                `type` VARCHAR(20) NOT NULL COMMENT '题型: SINGLE(单选), MULTI(多选), JUDGE(判断), GAP(填空), ESSAY(简答)',
                                `content` TEXT NOT NULL COMMENT '题目题干内容',
-                               `options` JSON DEFAULT NULL COMMENT '选择题选项(如 ["A.xxx", "B.xxx"])，非选择题为NULL',
+                               `options` TEXT COMMENT '选择题选项(如 ["A.xxx", "B.xxx"])，非选择题为NULL',
                                `answer` TEXT NOT NULL COMMENT '标准答案(用于AI核对标准)',
                                `is_llm_generated` TINYINT DEFAULT '0' COMMENT '💥[对话大模型] 是否为AI辅助生成的题目: 0否, 1是',
                                `asr_audio_url` VARCHAR(255) DEFAULT NULL COMMENT '💥[ASR算法] 教师语音录入的原始音频文件路径(留痕)',
@@ -147,10 +147,10 @@ CREATE TABLE `tb_questionnaire` (
                                     `class_id` BIGINT DEFAULT NULL COMMENT '目标班级ID',
                                     `course_id` BIGINT DEFAULT NULL COMMENT '关联课程ID',
                                     `title` VARCHAR(150) NOT NULL COMMENT '问卷标题(如: 2026期中教学满意度调查)',
-                                    `content_json` JSON NOT NULL COMMENT '问卷题目题干(以JSON数组格式存放各种量表题)',
+                                    `content_json` TEXT NOT NULL COMMENT '问卷题目题干(以JSON数组格式存放各种量表题)',
                                     `status` TINYINT DEFAULT '1' COMMENT '状态: 0关闭, 1开启',
                                     `response_count` INT DEFAULT '0' COMMENT '问卷填写人数统计',
-                                    `avg_score` DECIMAL(4,2) DEFAULT '0.00' COMMENT '问卷平均评分',
+                                    `avg_score` DOUBLE DEFAULT 0 COMMENT '问卷平均评分',
                                     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='问卷调查表';
@@ -160,14 +160,27 @@ CREATE TABLE `tb_evaluation_report` (
                                         `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '评价报告ID',
                                         `teacher_id` BIGINT NOT NULL COMMENT '被评价教师ID',
                                         `course_id` BIGINT NOT NULL COMMENT '关联课程ID',
-                                        `course_name` VARCHAR(100) COMMENT '课程名称',
-                                        `teacher_name` VARCHAR(50) COMMENT '教师姓名',
+                                        `course_name` VARCHAR(100) DEFAULT NULL COMMENT '课程名称',
+                                        `teacher_name` VARCHAR(50) DEFAULT NULL COMMENT '教师姓名',
                                         `avg_satisfaction` DECIMAL(4,2) COMMENT '根据问卷汇总出的客观满意度得分',
                                         `response_count` INT DEFAULT '0' COMMENT '问卷填写人数',
                                         `llm_analysis_report` TEXT COMMENT '💥[对话大模型] AI综合问卷、学生成绩、出勤率生成的教学效果诊断报告',
                                         `generate_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
                                         PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教学效果评价及大模型诊断报告表';
+
+DROP TABLE IF EXISTS `tb_questionnaire_answer`;
+CREATE TABLE `tb_questionnaire_answer` (
+                                           `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '答案记录ID',
+                                           `questionnaire_id` BIGINT NOT NULL COMMENT '关联问卷ID',
+                                           `student_id` BIGINT NOT NULL COMMENT '学生ID',
+                                           `student_name` VARCHAR(50) NOT NULL COMMENT '学生姓名(冗余字段)',
+                                           `scores_json` TEXT COMMENT '学生各题得分的JSON数据',
+                                           `total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '问卷总分',
+                                           `submit_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
+                                           PRIMARY KEY (`id`),
+                                           KEY `idx_questionnaire_student` (`questionnaire_id`, `student_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生问卷答案提交表';
 
 -- ----------------------------
 -- 7. 问题中心与系统门户 (对应功能：问题中心、网站门户)
@@ -248,8 +261,8 @@ INSERT INTO `tb_question` (`id`, `course_id`, `type`, `content`, `options`, `ans
 (5, 1, 'GAP', 'Transformer模型的核心机制是____', NULL, '注意力机制', 0);
 
 -- 教学评价报告初始化数据
-INSERT INTO `tb_evaluation_report` (`id`, `teacher_id`, `course_id`, `avg_satisfaction`, `llm_analysis_report`, `generate_time`) VALUES 
-(1, 1, 1, 87.50, '【教学效果诊断报告】\n\n📊 数据概览：\n本次评价满意度得分 87.50 分，整体处于优秀水平。\n\n✅ 教学亮点：\n1. 教师授课态度认真负责，教学准备充分\n2. 课程内容覆盖全面，理论与实践结合紧密\n3. 课后作业设计合理，能有效巩固知识点\n\n⚠️ 存在问题：\n1. 课堂互动环节偏少，学生主动参与率有待提高\n2. 部分难点讲解速度偏快，基础薄弱学生跟不上\n\n💡 改进建议：\n1. 增加课堂小组讨论和随堂测试环节\n2. 针对难点录制微课视频供学生反复观看', '2026-05-20 10:00:00'),
-(2, 1, 1, 82.30, NULL, '2026-05-15 14:30:00');
+INSERT INTO `tb_evaluation_report` (`id`, `teacher_id`, `course_id`, `course_name`, `teacher_name`, `avg_satisfaction`, `llm_analysis_report`, `generate_time`) VALUES 
+(1, 1, 1, '大模型应用与微调技术', '张教授', 87.50, '【教学效果诊断报告】\n\n📊 数据概览：\n本次评价满意度得分 87.50 分，整体处于优秀水平。\n\n✅ 教学亮点：\n1. 教师授课态度认真负责，教学准备充分\n2. 课程内容覆盖全面，理论与实践结合紧密\n3. 课后作业设计合理，能有效巩固知识点\n\n⚠️ 存在问题：\n1. 课堂互动环节偏少，学生主动参与率有待提高\n2. 部分难点讲解速度偏快，基础薄弱学生跟不上\n\n💡 改进建议：\n1. 增加课堂小组讨论和随堂测试环节\n2. 针对难点录制微课视频供学生反复观看', '2026-05-20 10:00:00'),
+(2, 1, 1, '大模型应用与微调技术', '张教授', 82.30, NULL, '2026-05-15 14:30:00');
 
 SET FOREIGN_KEY_CHECKS = 1;

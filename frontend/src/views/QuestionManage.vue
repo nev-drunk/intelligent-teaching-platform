@@ -1077,8 +1077,23 @@ function typeLabel(type) {
 }
 
 function formatDate(s) {
-  if (!s) return '—'
+  // 1. 如果是空值，或者是不小心变成字符串的 "undefined" / "null"，直接返回 '—'
+  if (!s || s === 'undefined' || s === 'null') return '—'
+
+  // 2. 如果后端给的是 10 位数字时间戳（秒），自动乘以 1000 转换为毫秒
+  if (typeof s === 'number' && String(s).length === 10) {
+    s = s * 1000
+  }
+
   const d = new Date(s)
+
+  // 3. 核心防御：检查 new Date() 转换后是否合法
+  // 如果是 Invalid Date，isNaN(d.getTime()) 会返回 true
+  if (isNaN(d.getTime())) {
+    console.error('formatDate 收到无法解析的时间数据:', s) // 方便你调试看看到底传进来了什么
+    return '—' // 或者返回原始值 s，至少不会显示丑陋的 NaN
+  }
+
   const p = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(
     d.getMinutes()

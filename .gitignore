@@ -1,11 +1,41 @@
 # 前端依赖
 frontend/node_modules/
 
-# 后端编译产物
+# 后端编译产物与IDE配置
 backend/target/
 backend/.idea/
 backend/*.iml
+.vscode/
 
-# 系统文件
+# 系统与工具缓存
 .DS_Store
 Thumbs.db
+.aider*
+
+# 忽略 Python 编译缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# 忽略本地开发环境
+.venv/
+venv/
+env/
+
+# 💥 绝对不要把模型文件推上 Git
+models/
+*.pt
+*.pth
+*.onnx
+*.bin
+*.pkl
+*.tar
+
+# 忽略 AI 服务或测试生成的临时多媒体文件（避免误伤前端 src 下的素材）
+ai-service/**/*.mp3
+ai-service/**/*.wav
+ai-service/**/*.png
+ai-service/**/*.jpg
+backend/uploads/
