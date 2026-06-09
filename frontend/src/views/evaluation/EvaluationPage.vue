@@ -492,26 +492,15 @@ async function handleBatchAiDiagnose() {
             {{ row.generateTime || row.createTime || '—' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" align="center">
+        <el-table-column label="操作" width="230" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button
-              size="small"
-              :icon="MagicStick"
-              class="ai-btn"
-              :loading="aiLoading && currentDiagnosingId === row.id"
-              @click="handleAiDiagnose(row)"
-            >
-              {{ row.llmAnalysisReport ? '重新诊断' : 'AI诊断' }}
+            <el-button size="small" :icon="MagicStick" type="primary" link :loading="aiLoading && currentDiagnosingId === row.id" @click="handleAiDiagnose(row)">
+              AI诊断
             </el-button>
-            <el-button
-              v-if="row.llmAnalysisReport"
-              size="small"
-              :icon="View"
-              @click="viewAiReport(row)"
-            >
-              查看报告
+            <el-button v-if="row.llmAnalysisReport" size="small" :icon="View" link @click="viewAiReport(row)">
+              查看
             </el-button>
-            <el-button size="small" :icon="Delete" type="danger" plain @click="handleDelete(row)">
+            <el-button size="small" :icon="Delete" type="danger" link @click="handleDelete(row)">
               删除
             </el-button>
           </template>

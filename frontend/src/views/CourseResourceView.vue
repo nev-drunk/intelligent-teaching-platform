@@ -42,6 +42,20 @@
               <td class="cell-actions">
                 <button class="btn-text btn-edit" @click="handleCrop(res)">图像分割</button>
                 <button class="btn-text btn-info" @click="previewFile(res)">预览</button>
+                <button
+                  class="btn-text btn-layout"
+                  @click="handleLayoutDetect(res)"
+                  :disabled="layoutDetecting === res.id"
+                >
+                  {{ layoutDetecting === res.id ? '检测中...' : '🧩 课件分析' }}
+                </button>
+                <button
+                  class="btn-text btn-paper"
+                  @click="handlePaperAnalyze(res)"
+                  :disabled="paperAnalyzing === res.id"
+                >
+                  {{ paperAnalyzing === res.id ? '分析中...' : '📄 试卷分析' }}
+                </button>
                 <button class="btn-text btn-danger" @click="handleDelete(res.id)">删除</button>
               </td>
             </tr>
@@ -104,6 +118,126 @@
       </div>
     </div>
 
+    <!-- AI 版面检测结果弹窗 -->
+    <div v-if="showLayoutModal" class="modal-overlay" @click.self="closeLayoutModal">
+      <div class="ai-detection-layout">
+        <!-- 左侧：图片预览 -->
+        <div class="layout-left-preview">
+          <canvas ref="layoutCanvasRef" class="layout-canvas"></canvas>
+        </div>
+
+        <!-- 右侧：操作面板 -->
+        <div class="layout-right-panel">
+          <div class="panel-header">🤖 检测区域列表</div>
+
+          <div v-if="layoutBoxes.length === 0" class="layout-empty">未检测到区域</div>
+
+          <!-- 分类筛选 -->
+          <div v-if="layoutBoxes.length > 0" class="filter-section">
+            <label
+              v-for="cat in layoutCategories"
+              :key="cat.key"
+              class="category-filter-item"
+              :style="{ borderColor: cat.color }"
+            >
+              <input type="checkbox" v-model="cat.checked" @change="onCategoryFilterChange" />
+              <span class="category-filter-dot" :style="{ background: cat.color }"></span>
+              {{ cat.name }}({{ cat.count }})
+            </label>
+            <div class="filter-actions">
+              <el-button size="small" text @click="selectAllBoxes(true)">全选</el-button>
+              <el-button size="small" text @click="selectAllBoxes(false)">取消</el-button>
+            </div>
+          </div>
+
+          <!-- 滚动列表 -->
+          <div class="scroll-list-container">
+            <div
+              v-for="({ box, idx }, i) in filteredLayoutBoxes"
+              :key="idx"
+              class="layout-box-item"
+              :class="{
+                'layout-box-item--checked': selectedBoxIndices.has(idx),
+                'layout-box-item--hovered': hoveredBoxIndex === idx
+              }"
+              @click="toggleBoxSelection(idx)"
+              @mouseenter="onBoxMouseEnter(idx)"
+              @mouseleave="onBoxMouseLeave"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedBoxIndices.has(idx)"
+                @click.stop
+                @change="toggleBoxSelection(idx)"
+                class="layout-box-checkbox"
+              />
+              <span class="layout-box-color" :style="{ background: getLabelColor(box.label) }"></span>
+              <span class="layout-box-label">{{ getLabelName(box.label) }}</span>
+              <span class="layout-box-conf">{{ box.confidence != null ? Math.round(box.confidence * 100) : 0 }}%</span>
+            </div>
+          </div>
+
+          <!-- 统计摘要 -->
+          <div v-if="layoutSummary" class="layout-summary">
+            <span v-if="layoutSummary.text_block_count" class="summary-tag" style="background:#dbeafe;color:#2563eb">文本块 {{ layoutSummary.text_block_count }}</span>
+            <span v-if="layoutSummary.table_count" class="summary-tag" style="background:#d1fae5;color:#059669">表格 {{ layoutSummary.table_count }}</span>
+            <span v-if="layoutSummary.diagram_count" class="summary-tag" style="background:#fef3c7;color:#d97706">图表 {{ layoutSummary.diagram_count }}</span>
+            <span v-if="layoutSummary.formula_count" class="summary-tag" style="background:#ede9fe;color:#7c3aed">公式 {{ layoutSummary.formula_count }}</span>
+          </div>
+
+          <!-- 底部按钮 -->
+          <div class="panel-footer">
+            <span v-if="selectedBoxIndices.size > 0" class="selected-hint">
+              已选 {{ selectedBoxIndices.size }} 个
+            </span>
+            <button class="btn-secondary" @click="closeLayoutModal">关闭</button>
+            <button
+              class="btn-primary"
+              :disabled="selectedBoxIndices.size === 0 || savingCropped"
+              @click="saveCroppedRegions"
+            >
+              {{ savingCropped ? '保存中...' : `📦 保存选中素材到资源库 (${selectedBoxIndices.size})` }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 试卷分析结果弹窗 -->
+    <div v-if="showPaperModal" class="modal-overlay" @click.self="closePaperModal">
+      <div class="ai-detection-layout">
+        <div class="layout-left-preview">
+          <canvas ref="paperCanvasRef" class="layout-canvas"></canvas>
+        </div>
+        <div class="layout-right-panel">
+          <div class="panel-header">📄 试卷分析结果 (paper-8n)</div>
+          <div v-if="paperResult" class="paper-stats">
+            <div class="paper-stat-item">检测区域: <strong>{{ paperResult.layout_boxes?.length || 0 }}</strong></div>
+            <div class="paper-stat-item">作答区: <strong>{{ paperResult.ocr_regions?.length || 0 }}</strong></div>
+            <div class="paper-stat-item">异常分数: <strong>{{ (paperResult.anomaly_score * 100).toFixed(0) }}%</strong></div>
+          </div>
+          <div class="filter-section" v-if="paperResult?.layout_boxes">
+            <span v-for="(count, label) in paperLabelCounts" :key="label" class="paper-label-tag" :style="{background: getLayoutColor(label)}">
+              {{ label }}: {{ count }}
+            </span>
+          </div>
+          <div class="scroll-list-container">
+            <div v-if="paperResult?.ocr_regions?.length" class="paper-ocr-list">
+              <div v-for="(r, i) in paperResult.ocr_regions" :key="i" class="paper-ocr-item">
+                <span class="paper-ocr-idx">#{{ i+1 }}</span>
+                <span class="paper-ocr-label">{{ r.box.label }}</span>
+                <code class="paper-ocr-text">{{ r.ocr_text || '(空)' }}</code>
+              </div>
+            </div>
+            <div v-else class="layout-empty">未检测到作答区域</div>
+          </div>
+          <div class="panel-footer">
+            <button class="btn-secondary" @click="closePaperModal">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showCropModal" class="modal-overlay" @click.self="closeCropModal">
       <div class="modal-card modal-large">
         <div class="modal-header">
@@ -156,7 +290,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import 'vue-cropper/dist/index.css'
 import { VueCropper } from 'vue-cropper'
@@ -180,6 +314,399 @@ const cropImageUrl = ref('')
 const previewUrl = ref('')
 const currentResource = ref(null)
 const cropperKey = ref(0)
+
+// AI 版面检测相关
+const showLayoutModal = ref(false)
+const layoutDetecting = ref(null)
+const layoutBoxes = ref([])
+const layoutCanvasRef = ref(null)
+const layoutImageUrl = ref('')
+const layoutSummary = ref(null)
+const selectedBoxIndices = ref(new Set())
+const hoveredBoxIndex = ref(null)
+const savingCropped = ref(false)
+const currentLayoutResourceId = ref(null)
+
+// ── 试卷分析 (paper-8n) ──
+const showPaperModal = ref(false)
+const paperAnalyzing = ref(null)
+const paperResult = ref(null)
+const paperCanvasRef = ref(null)
+const paperImageUrl = ref('')
+const paperLabelCounts = computed(() => {
+  if (!paperResult.value?.layout_boxes) return {}
+  const c = {}
+  paperResult.value.layout_boxes.forEach(b => { c[b.label] = (c[b.label] || 0) + 1 })
+  return c
+})
+
+function getLayoutColor(label) {
+  const m = { Text: '#2563eb', Title: '#7c3aed', Header: '#ea580c', Footer: '#4f46e5', Figure: '#db2777', Table: '#059669', Equation: '#ca8a04' }
+  return m[label] || '#64748b'
+}
+
+async function handlePaperAnalyze(resource) {
+  paperAnalyzing.value = resource.id
+  try {
+    const imageUrl = 'http://localhost:8081' + resource.fileUrl
+    const res = await fetch(`http://localhost:8081/api/courses/resources/${resource.id}/paper-analyze`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+    })
+    const result = await res.json()
+    const data = result.data || result
+
+    if (data.error) { alert('试卷分析失败: ' + data.error); return }
+
+    paperResult.value = data
+    paperImageUrl.value = imageUrl
+    showPaperModal.value = true
+
+    await new Promise(r => setTimeout(r, 200))
+    renderPaperCanvas()
+  } catch (e) {
+    console.error('试卷分析失败:', e)
+    alert('试卷分析服务不可用: ' + e.message)
+  } finally {
+    paperAnalyzing.value = null
+  }
+}
+
+function renderPaperCanvas() {
+  const canvas = paperCanvasRef.value
+  if (!canvas || !paperImageUrl.value || !paperResult.value) return
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.onload = () => {
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+    const boxes = paperResult.value.layout_boxes || []
+    boxes.forEach(box => {
+      const x = box.x1, y = box.y1, w = box.x2 - box.x1, h = box.y2 - box.y1
+      const color = getLayoutColor(box.label)
+      ctx.fillStyle = color + '30'
+      ctx.fillRect(x, y, w, h)
+      ctx.strokeStyle = color
+      ctx.lineWidth = 3
+      ctx.strokeRect(x, y, w, h)
+      ctx.fillStyle = color
+      const lbl = `${box.label} ${Math.round(box.confidence*100)}%`
+      ctx.font = '11px sans-serif'
+      const tm = ctx.measureText(lbl)
+      ctx.fillRect(x, Math.max(0, y-16), tm.width+6, 16)
+      ctx.fillStyle = '#fff'
+      ctx.fillText(lbl, x+3, Math.max(11, y-4))
+    })
+  }
+  img.src = paperImageUrl.value
+}
+
+function closePaperModal() {
+  showPaperModal.value = false
+  paperResult.value = null
+  paperImageUrl.value = ''
+}
+
+// 分类筛选
+const LAYOUT_CATEGORY_META = {
+  text_block: { name: '文本块', color: '#3b82f6' },
+  table: { name: '表格', color: '#10b981' },
+  diagram: { name: '图表', color: '#f59e0b' },
+  formula: { name: '公式', color: '#8b5cf6' }
+}
+const layoutCategories = ref([])
+
+function rebuildCategories() {
+  const counts = {}
+  layoutBoxes.value.forEach((b) => {
+    counts[b.label] = (counts[b.label] || 0) + 1
+  })
+  layoutCategories.value = Object.entries(LAYOUT_CATEGORY_META).map(([key, meta]) => ({
+    key,
+    name: meta.name,
+    color: meta.color,
+    count: counts[key] || 0,
+    checked: true
+  }))
+}
+
+const filteredLayoutBoxes = computed(() => {
+  const enabled = new Set(
+    layoutCategories.value.filter((c) => c.checked).map((c) => c.key)
+  )
+  return layoutBoxes.value
+    .map((box, idx) => ({ box, idx }))
+    .filter(({ box }) => enabled.has(box.label))
+})
+
+// 勾选/取消单个区域
+function toggleBoxSelection(globalIdx) {
+  const next = new Set(selectedBoxIndices.value)
+  if (next.has(globalIdx)) next.delete(globalIdx)
+  else next.add(globalIdx)
+  selectedBoxIndices.value = next
+}
+
+// 鼠标悬停
+function onBoxMouseEnter(idx) {
+  hoveredBoxIndex.value = idx
+}
+function onBoxMouseLeave() {
+  hoveredBoxIndex.value = null
+}
+
+// 监听选中/悬停变化 → 重绘 Canvas
+watch([selectedBoxIndices, hoveredBoxIndex], () => {
+  nextTick(() => renderLayoutCanvas())
+}, { deep: true })
+
+// 全选/取消全选（仅影响当前筛选可见的区域）
+function selectAllBoxes(select) {
+  const next = new Set(selectedBoxIndices.value)
+  filteredLayoutBoxes.value.forEach(({ idx }) => {
+    if (select) next.add(idx)
+    else next.delete(idx)
+  })
+  selectedBoxIndices.value = next
+}
+
+// 分类筛选变化时
+function onCategoryFilterChange() {
+  // 不清空已有选择，只是切换可见性
+}
+
+// 加载原图用于 Canvas 裁剪
+function loadImageForCrop(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = url
+  })
+}
+
+// 核心：裁剪选中区域并上传为资源
+async function saveCroppedRegions() {
+  if (selectedBoxIndices.value.size === 0) return
+  savingCropped.value = true
+
+  try {
+    const img = await loadImageForCrop(layoutImageUrl.value)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+
+    let successCount = 0
+    const indices = [...selectedBoxIndices.value].sort((a, b) => a - b)
+
+    for (const idx of indices) {
+      const box = layoutBoxes.value[idx]
+      if (!box) continue
+
+      const x = Math.round(box.x1)
+      const y = Math.round(box.y1)
+      const w = Math.round(box.x2 - box.x1)
+      const h = Math.round(box.y2 - box.y1)
+
+      if (w <= 0 || h <= 0) continue
+
+      // Canvas 裁剪
+      canvas.width = w
+      canvas.height = h
+      ctx.clearRect(0, 0, w, h)
+      ctx.drawImage(img, x, y, w, h, 0, 0, w, h)
+
+      // 转 Blob → File
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      const file = new File([blob], `${getLabelName(box.label)}_${idx + 1}.png`, { type: 'image/png' })
+
+      // 上传为新资源
+      try {
+        await courseApi.uploadResource(file, courseId, `[${getLabelName(box.label)}] 自动裁剪 #${idx + 1}`)
+        successCount++
+      } catch (e) {
+        console.error(`上传区域 ${idx} 失败:`, e)
+      }
+    }
+
+    alert(`素材保存完成！成功 ${successCount}/${indices.length} 个`)
+    selectedBoxIndices.value = new Set()
+    closeLayoutModal()
+    fetchResources()
+  } catch (e) {
+    console.error('裁剪保存失败:', e)
+    alert('素材保存失败: ' + e.message)
+  } finally {
+    savingCropped.value = false
+  }
+}
+
+// 类别颜色映射
+const LABEL_COLORS = {
+  text_block: '#3b82f6',
+  table: '#10b981',
+  diagram: '#f59e0b',
+  formula: '#8b5cf6'
+}
+const LABEL_NAMES = {
+  text_block: '文本块',
+  table: '表格',
+  diagram: '图表',
+  formula: '公式'
+}
+
+function getLabelColor(label) {
+  return LABEL_COLORS[label] || '#94a3b8'
+}
+
+function getLabelName(label) {
+  return LABEL_NAMES[label] || label
+}
+
+/**
+ * AI 版面检测 — 调用后端接口
+ */
+async function handleLayoutDetect(resource) {
+  layoutDetecting.value = resource.id
+  currentLayoutResourceId.value = resource.id
+  selectedBoxIndices.value = new Set()
+  try {
+    // 构建文件 URL（用于 Canvas 渲染）
+    const imageUrl = 'http://localhost:8081' + resource.fileUrl
+
+    // 调用后端课件分析接口（无需上传文件，直接根据已存储的 file_url 分析）
+    const res = await fetch(
+      `http://localhost:8081/api/courses/resources/${resource.id}/analyze`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + localStorage.getItem('token')
+        }
+      }
+    )
+    const data = await res.json()
+
+    if (data.code === 200 && data.data) {
+      // 优先使用返回的检测结果
+      const regions = data.data.segmentedRegions
+      if (regions) {
+        try {
+          const parsed = JSON.parse(regions)
+          // 支持两种格式: 纯数组 boxes 或 {boxes: [...], summary: {...}}
+          if (Array.isArray(parsed)) {
+            layoutBoxes.value = parsed
+            layoutSummary.value = null
+          } else if (parsed.boxes) {
+            layoutBoxes.value = parsed.boxes
+            layoutSummary.value = parsed.summary || null
+          } else {
+            layoutBoxes.value = []
+            layoutSummary.value = null
+          }
+        } catch {
+          layoutBoxes.value = []
+          layoutSummary.value = null
+        }
+      } else {
+        layoutBoxes.value = []
+        layoutSummary.value = null
+      }
+
+      layoutImageUrl.value = imageUrl
+      rebuildCategories()
+      showLayoutModal.value = true
+
+      // 在下一个 tick 渲染 Canvas
+      await new Promise((r) => setTimeout(r, 100))
+      renderLayoutCanvas()
+    } else {
+      alert('版面检测失败: ' + (data.msg || '未知错误'))
+    }
+  } catch (e) {
+    console.error('AI版面检测失败:', e)
+    alert('AI版面检测服务不可用，请确保 Flask 服务已启动: ' + e.message)
+  } finally {
+    layoutDetecting.value = null
+  }
+}
+
+/**
+ * 在 Canvas 上绘制图片和检测框
+ */
+function renderLayoutCanvas() {
+  const canvas = layoutCanvasRef.value
+  if (!canvas || !layoutImageUrl.value) return
+
+  const ctx = canvas.getContext('2d')
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+
+  img.onload = () => {
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+
+    // 绘制原图
+    ctx.drawImage(img, 0, 0)
+
+    // 绘制检测框
+    layoutBoxes.value.forEach((box, idx) => {
+      const x = box.x1
+      const y = box.y1
+      const w = box.x2 - box.x1
+      const h = box.y2 - box.y1
+      const categoryColor = getLabelColor(box.label)
+
+      const isSelected = selectedBoxIndices.value.has(idx)
+      const isHovered = hoveredBoxIndex.value === idx
+      const isHighlighted = isSelected || isHovered
+
+      if (isHighlighted) {
+        // 红色半透明填充
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.15)'
+        ctx.fillRect(x, y, w, h)
+        // 红色粗边框
+        ctx.strokeStyle = '#FF0000'
+        ctx.lineWidth = 3
+      } else {
+        ctx.strokeStyle = categoryColor
+        ctx.lineWidth = 2
+      }
+      ctx.strokeRect(x, y, w, h)
+
+      // 标签背景
+      const labelText = `${getLabelName(box.label)} ${box.confidence != null ? Math.round(box.confidence * 100) : 0}%`
+      ctx.font = '13px "PingFang SC", "Microsoft YaHei", sans-serif'
+      const textMetrics = ctx.measureText(labelText)
+      const textWidth = textMetrics.width + 12
+      const textHeight = 22
+
+      ctx.fillStyle = isHighlighted ? '#FF0000' : categoryColor
+      ctx.fillRect(x, y - textHeight - 2, textWidth, textHeight)
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(labelText, x + 6, y - 8)
+    })
+  }
+
+  img.onerror = () => {
+    console.error('图片加载失败')
+  }
+
+  img.src = layoutImageUrl.value
+}
+
+function closeLayoutModal() {
+  showLayoutModal.value = false
+  layoutBoxes.value = []
+  layoutImageUrl.value = ''
+  layoutSummary.value = null
+  selectedBoxIndices.value = new Set()
+  hoveredBoxIndex.value = null
+  layoutCategories.value = []
+  currentLayoutResourceId.value = null
+}
 
 // 1️⃣ 获取资源列表
 // 1️⃣ 获取资源列表
@@ -575,7 +1102,8 @@ onMounted(fetchResources)
   animation: modalIn 0.3s ease;
 }
 .modal-large {
-  width: 900px;
+  width: 960px;
+  max-width: 92vw;
 }
 @keyframes modalIn {
   from {
@@ -708,6 +1236,7 @@ onMounted(fetchResources)
   border-top: 1px solid #f0f0f0;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
 }
 .crop-body {
@@ -775,5 +1304,256 @@ onMounted(fetchResources)
   flex: 1;
   padding: 8px 12px;
   font-size: 13px;
+}
+
+/* ── AI 版面检测样式 ── */
+.btn-layout {
+  color: #8b5cf6;
+}
+.btn-layout:hover {
+  background: rgba(139, 92, 246, 0.1);
+}
+.btn-layout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-paper {
+  color: #059669;
+}
+.btn-paper:hover {
+  background: rgba(5, 150, 105, 0.1);
+}
+.btn-paper:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 试卷分析 */
+.paper-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.paper-stat-item {
+  font-size: 13px;
+  color: #475569;
+}
+.paper-stat-item strong {
+  color: #1e293b;
+}
+.paper-label-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #334155;
+  display: inline-block;
+}
+.paper-ocr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.paper-ocr-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.paper-ocr-idx {
+  color: #94a3b8;
+  font-size: 11px;
+  width: 24px;
+}
+.paper-ocr-label {
+  color: #059669;
+  font-weight: 500;
+  font-size: 11px;
+  min-width: 50px;
+}
+.paper-ocr-text {
+  color: #1e293b;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* ======== 弹窗主体 ======== */
+.ai-detection-layout {
+  display: flex !important;
+  width: 960px;
+  max-width: 92vw;
+  height: 70vh;
+  gap: 0;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.15);
+}
+
+/* ======== 左侧：图片预览 ======== */
+.layout-left-preview {
+  flex: 1.5;
+  height: 100%;
+  background: #f7f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  border-radius: 16px 0 0 16px;
+}
+.layout-left-preview canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ======== 右侧：操作面板 ======== */
+.layout-right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-left: 1px solid #e8e8e8;
+  padding: 20px;
+  min-width: 0;
+}
+.panel-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.filter-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.filter-actions {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+/* ======== 滚动列表 ======== */
+.scroll-list-container {
+  flex: 1;
+  overflow-y: auto !important;
+  margin-bottom: 12px;
+  padding-right: 5px;
+  min-height: 0;
+}
+
+/* ======== 统计摘要 ======== */
+.layout-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.summary-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* ======== 底部按钮 ======== */
+.panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+.layout-empty {
+  font-size: 13px;
+  color: #94a3b8;
+  padding: 16px 0;
+  text-align: center;
+}
+.layout-box-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.layout-box-item:hover {
+  background: #eef2ff;
+}
+.layout-box-item--checked {
+  background: #dbeafe;
+  border: 1px solid #3b82f6;
+}
+.layout-box-item--hovered {
+  background: #fef2f2;
+  border: 1px solid #f87171;
+}
+.layout-box-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.layout-box-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.layout-box-label {
+  flex: 1;
+  color: #334155;
+  font-weight: 500;
+}
+.layout-box-conf {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 12px;
+}
+.category-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+.category-filter-item:hover {
+  border-color: #3b82f6;
+}
+.category-filter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.selected-hint {
+  font-size: 13px;
+  color: #3b82f6;
+  margin-right: auto;
 }
 </style>

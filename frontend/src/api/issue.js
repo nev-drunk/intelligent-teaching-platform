@@ -22,6 +22,11 @@ const issueApi = {
     return request.post('/api/issue/create', data).then((res) => res.data)
   },
 
+  /** 发布问题并返回 Top3 相似历史问题 */
+  createWithSimilarity(data) {
+    return request.post('/api/issue/create-with-similarity', data).then((res) => res.data)
+  },
+
   /** 教师回复问题 */
   reply(id, teacherReply) {
     return request.put(`/api/issue/${id}/reply`, { teacherReply })

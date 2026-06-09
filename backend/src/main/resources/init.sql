@@ -225,44 +225,78 @@ CREATE TABLE `tb_student` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生信息表';
 
 -- ----------------------------
--- 9. 默认测试基础初始化数据
+-- 9. 演示数据
 -- ----------------------------
+
+-- 教师
 INSERT INTO `tb_teacher` (`id`, `username`, `password`, `name`) VALUES (1, 'admin', '123456', '张教授');
-INSERT INTO `tb_class` (`id`, `class_name`, `teacher_id`) VALUES (1, '2024级软件工程1班', 1);
-INSERT INTO `tb_class` (`id`, `class_name`, `teacher_id`) VALUES (2, '2024级软件工程2班', 1);
-INSERT INTO `tb_course` (`id`, `course_name`, `teacher_id`, `description`) VALUES (1, '大模型应用与微调技术', 1, '本课程讲授深度学习、大模型接口调用及提示词工程。');
 
--- 学生数据
-INSERT INTO `tb_student` (`id`, `student_name`, `class_id`, `student_no`) VALUES 
-(1, '李明', 1, '2024001'),
-(2, '王小红', 1, '2024002'),
-(3, '张伟', 1, '2024003'),
-(4, '刘芳', 2, '2024004'),
-(5, '陈强', 2, '2024005');
+-- 班级
+INSERT INTO `tb_class` (`id`, `class_name`, `teacher_id`) VALUES (1, '2024级软件工程1班', 1), (2, '2024级计算机科学2班', 1);
 
--- 任务数据
-INSERT INTO `tb_task` (`id`, `course_id`, `class_id`, `title`, `type`, `content_text`, `deadline`) VALUES 
-(1, 1, 1, '第一次编程作业', 'HOMEWORK', '完成Transformer架构实现', '2026-05-25 23:59:59'),
-(2, 1, 1, '第二次编程作业', 'HOMEWORK', '实现提示词工程案例', '2026-05-30 23:59:59'),
-(3, 1, 2, '第三次编程作业', 'HOMEWORK', '微调技术实验', '2026-06-05 23:59:59');
+-- 课程
+INSERT INTO `tb_course` (`id`, `course_name`, `teacher_id`, `description`) VALUES
+(1, '大模型应用与微调技术', 1, '讲授深度学习基础、Transformer架构、大模型接口调用与提示词工程'),
+(2, '程序设计基础(Python)', 1, 'Python基础语法、数据结构、面向对象编程入门');
 
--- 学生提交数据
-INSERT INTO `tb_submission` (`id`, `task_id`, `student_id`, `student_name`, `submit_text`, `status`, `submit_time`) VALUES 
-(1, 1, 1, '李明', '已完成Transformer架构实现，代码见附件', 'SUBMITTED', '2026-05-20 14:30:00'),
-(2, 2, 2, '王小红', '提示词工程案例已完成', 'SUBMITTED', '2026-05-18 09:15:00'),
-(3, 3, 3, '张伟', '微调技术实验报告', 'SUBMITTED', '2026-05-15 16:45:00');
+-- 学生
+INSERT INTO `tb_student` (`id`, `student_name`, `class_id`, `student_no`) VALUES
+(1, '李明', 1, '2024001'), (2, '王小红', 1, '2024002'), (3, '张伟', 1, '2024003'),
+(4, '刘芳', 2, '2024004'), (5, '陈强', 2, '2024005'),
+(6, '赵强', 1, '2024006'), (7, '孙丽', 2, '2024007'), (8, '周杰', 1, '2024008');
 
--- 题库初始化数据
-INSERT INTO `tb_question` (`id`, `course_id`, `type`, `content`, `options`, `answer`, `is_llm_generated`) VALUES 
-(1, 1, 'SINGLE', '什么是牛顿第一定律？', '["A. 物体保持静止或匀速直线运动状态", "B. 力是改变物体运动状态的原因", "C. 作用力与反作用力相等", "D. 加速度与力成正比"]', 'A', 0),
-(2, 1, 'SINGLE', '勾股定理的公式是什么？', '["A. a + b = c", "B. a² + b² = c²", "C. a - b = c", "D. a × b = c"]', 'B', 0),
-(3, 1, 'JUDGE', '水的化学式是 H₂O', NULL, '正确', 0),
-(4, 1, 'MULTI', '以下哪些是深度学习框架？', '["A. TensorFlow", "B. PyTorch", "C. Vue", "D. Keras"]', 'ABD', 1),
-(5, 1, 'GAP', 'Transformer模型的核心机制是____', NULL, '注意力机制', 0);
+-- 题库
+INSERT INTO `tb_question` (`id`, `course_id`, `type`, `content`, `options`, `answer`, `is_llm_generated`) VALUES
+(1, 1, 'SINGLE', 'Transformer模型的核心机制是什么？', '["A. CNN","B. RNN","C. 自注意力机制","D. LSTM"]', 'C', 0),
+(2, 1, 'SINGLE', '以下哪个是Python定义函数的关键字？', '["A. func","B. def","C. fn","D. lambda"]', 'B', 0),
+(3, 1, 'JUDGE', 'BERT是基于Transformer架构的预训练模型', NULL, 'T', 0),
+(4, 1, 'JUDGE', 'GPT属于CNN架构', NULL, 'F', 0),
+(5, 1, 'GAP', '深度学习中的____机制允许模型关注输入的不同部分', NULL, '注意力', 0),
+(6, 1, 'SINGLE', 'Python中列表(list)和元组(tuple)的主要区别是？', '["A. 列表有序元组无序","B. 列表可变元组不可变","C. 没有区别","D. 元组可以排序"]', 'B', 0),
+(7, 2, 'SINGLE', 'Python中用于输出到控制台的函数是？', '["A. input()","B. print()","C. echo()","D. write()"]', 'B', 0),
+(8, 2, 'SINGLE', '以下哪个是Python的不可变数据类型？', '["A. list","B. dict","C. str","D. set"]', 'C', 0);
 
--- 教学评价报告初始化数据
-INSERT INTO `tb_evaluation_report` (`id`, `teacher_id`, `course_id`, `course_name`, `teacher_name`, `avg_satisfaction`, `llm_analysis_report`, `generate_time`) VALUES 
-(1, 1, 1, '大模型应用与微调技术', '张教授', 87.50, '【教学效果诊断报告】\n\n📊 数据概览：\n本次评价满意度得分 87.50 分，整体处于优秀水平。\n\n✅ 教学亮点：\n1. 教师授课态度认真负责，教学准备充分\n2. 课程内容覆盖全面，理论与实践结合紧密\n3. 课后作业设计合理，能有效巩固知识点\n\n⚠️ 存在问题：\n1. 课堂互动环节偏少，学生主动参与率有待提高\n2. 部分难点讲解速度偏快，基础薄弱学生跟不上\n\n💡 改进建议：\n1. 增加课堂小组讨论和随堂测试环节\n2. 针对难点录制微课视频供学生反复观看', '2026-05-20 10:00:00'),
-(2, 1, 1, '大模型应用与微调技术', '张教授', 82.30, NULL, '2026-05-15 14:30:00');
+-- 试卷
+INSERT INTO `tb_exam_paper` (`id`, `course_id`, `title`, `total_score`, `class_id`, `teacher_id`) VALUES
+(1, 1, '大模型期中测验', 40, 1, 1);
+
+INSERT INTO `tb_paper_question` (`paper_id`, `question_id`, `sort`, `score`) VALUES
+(1, 1, 1, 10), (1, 2, 2, 10), (1, 3, 3, 10), (1, 4, 4, 10);
+
+-- 任务（三种类型全覆盖）
+INSERT INTO `tb_task` (`id`, `course_id`, `class_id`, `title`, `type`, `content_text`, `paper_id`, `deadline`) VALUES
+(1, 1, 1, '📝 作业：分析Transformer架构', 'HOMEWORK', '请详细分析Transformer架构的核心组件及其工作原理，不少于100字', NULL, '2026-06-30 23:59:59'),
+(2, 1, 1, '📋 选择题小测：深度学习基础', 'CHOICE', '[ANSWERS:C,B,T,F] 请上传选择题答题卡图片', NULL, '2026-06-30 23:59:59'),
+(3, 1, 1, '📄 大模型期中测验', 'EXAM', '期中正式考试，关联试卷进行AI批改', 1, '2026-06-30 23:59:59');
+
+-- 提交（文本作业 + 图片提交 + 试卷提交）
+INSERT INTO `tb_submission` (`id`, `task_id`, `student_id`, `student_name`, `submit_text`, `file_url`, `status`, `ai_score`, `ai_comment`, `plagiarism_rate`, `submit_time`) VALUES
+-- 文本作业(task 1)：用于演示DeepSeek评阅+文本查重
+(1, 1, 1, '李明', 'Transformer架构由编码器和解码器组成，核心是自注意力机制和多头注意力。编码器将输入序列映射到隐空间，解码器从隐空间生成输出序列。位置编码用于保留序列顺序信息。', NULL, 'AI_PROCESSED', 85, '共0题，答对0题，得分0/0 【AI评语】对Transformer架构理解深入，表述清晰。', 0.00, '2026-06-01 10:00:00'),
+(2, 1, 2, '王小红', 'Transformer架构包含编码器和解码器，核心组件是自注意力机制和多头注意力。编码器负责将输入映射到隐空间，解码器从隐空间生成输出。同时使用位置编码保留顺序信息。', NULL, 'AI_PROCESSED', 80, '共0题，答对0题，得分0/0 【AI评语】理解基本到位，建议更详细描述前馈网络层的作用。', 79.50, '2026-06-01 11:00:00'),
+(3, 1, 3, '张伟', '深度学习在自然语言处理中有广泛应用。循环神经网络处理序列数据但存在梯度消失问题。LSTM和GRU是改进变体。注意力机制解决了长距离依赖问题，Transformer基于此设计。', NULL, 'AI_PROCESSED', 70, '共0题，答对0题，得分0/0 【AI评语】内容偏离了Transformer架构主题。', 0.00, '2026-06-01 12:00:00'),
+(4, 1, 6, '赵强', 'Transformer架构由编码器和解码器组成，核心是自注意力机制和多头注意力。编码器将输入序列映射到隐空间，解码器从隐空间生成输出序列。位置编码用于保留序列顺序信息。', NULL, 'AI_PROCESSED', 85, '共0题，答对0题，得分0/0 【AI评语】与李明提交内容高度相似。', 100.00, '2026-06-02 09:00:00'),
+-- 选择题(task 2)：图片提交
+(5, 2, 1, '李明', NULL, 'uploads/submissions/demo_choice_card.png', 'AI_PROCESSED', 30, '选择题作业：共4题，答对3题，得分30/40', 0.00, '2026-06-03 10:00:00'),
+(6, 2, 2, '王小红', NULL, 'uploads/submissions/demo_choice_card2.png', 'AI_PROCESSED', 20, '选择题作业：共4题，答对2题，得分20/40', 0.00, '2026-06-03 11:00:00'),
+-- 试卷考试(task 3, paperId=1)：
+(7, 3, 3, '张伟', NULL, 'uploads/submissions/demo_exam_paper.png', 'AI_PROCESSED', 30, '共4题，答对3题，得分30/40', 30.00, '2026-06-05 14:00:00'),
+(8, 3, 6, '赵强', NULL, 'uploads/submissions/demo_exam_paper2.png', 'AI_PROCESSED', 20, '共4题，答对2题，得分20/40', 30.00, '2026-06-05 14:30:00');
+
+-- 教学评价报告
+INSERT INTO `tb_evaluation_report` (`id`, `teacher_id`, `course_id`, `course_name`, `teacher_name`, `avg_satisfaction`, `response_count`, `llm_analysis_report`, `generate_time`) VALUES
+(1, 1, 1, '大模型应用与微调技术', '张教授', 87.50, 45, '【教学效果诊断报告】\n\n📊 数据概览：\n本次评价满意度得分 87.50 分，整体处于优秀水平。\n\n✅ 教学亮点：\n1. 教师授课态度认真负责，教学准备充分\n2. 课程内容覆盖全面，理论与实践结合紧密\n3. 课后作业设计合理，能有效巩固知识点\n\n⚠️ 存在问题：\n1. 课堂互动环节偏少，学生主动参与率有待提高\n2. 部分难点讲解速度偏快，基础薄弱学生跟不上\n\n💡 改进建议：\n1. 增加课堂小组讨论和随堂测试环节\n2. 针对难点录制微课视频供学生反复观看', '2026-06-01 10:00:00'),
+(2, 1, 2, '程序设计基础(Python)', '张教授', 82.30, 38, NULL, '2026-06-01 10:00:00'),
+(3, 1, 1, '大模型应用与微调技术', '张教授', 91.20, 52, '【教学效果诊断报告】\n\n整体满意度91.2分，教学效果显著。学生普遍反映课程内容丰富。', '2026-06-08 10:00:00');
+
+-- 问题中心示例
+INSERT INTO `tb_issue_center` (`id`, `course_id`, `student_id`, `student_name`, `question_text`, `ai_suggested_answer`, `status`) VALUES
+(1, 1, 1, '李明', 'Transformer中的位置编码为什么用正弦余弦而不是直接学一个embedding？', '正弦余弦位置编码具有良好的外推性，可以处理比训练时更长的序列。这是Transformer原始论文的设计选择，后来的模型如BERT也使用了可学习的位置编码。', 1),
+(2, 1, 2, '王小红', '多头注意力的"头"数量如何选择？', '头数通常是模型维度的约数，常见配置：d_model=512时h=8，d_model=768时h=12。头数越多，每个头关注的子空间越小，但计算量越大。', 1);
+
+-- 门户公告
+INSERT INTO `tb_portal_notice` (`id`, `teacher_id`, `title`, `content`, `create_time`) VALUES
+(1, 1, '关于期末考试安排的通知', '本学期期末考试定于2026年7月1日进行，请同学们提前做好准备，认真复习。', '2026-06-01 08:00:00'),
+(2, 1, '大模型应用课程作业提交提醒', '第一次编程作业截止日期为6月30日，请还未提交的同学尽快完成并提交。', '2026-06-05 08:00:00');
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -95,20 +95,53 @@
             </div>
           </div>
 
+          <!-- 作业类型 Tab -->
+          <div class="type-tabs">
+            <button :class="['type-tab', { active: typeFilter === '' }]" @click="typeFilter = ''">
+              全部
+            </button>
+            <button
+              :class="['type-tab', { active: typeFilter === 'HOMEWORK' }]"
+              @click="typeFilter = 'HOMEWORK'"
+            >
+              📝 普通作业
+            </button>
+            <button
+              :class="['type-tab', { active: typeFilter === 'CHOICE' }]"
+              @click="typeFilter = 'CHOICE'"
+            >
+              📋 选择题
+            </button>
+            <button
+              :class="['type-tab', { active: typeFilter === 'EXAM' }]"
+              @click="typeFilter = 'EXAM'"
+            >
+              📄 卷子
+            </button>
+          </div>
+
           <div class="search-bar">
             <el-form :model="searchForm" class="search-form">
+              <el-form-item label="任务" class="search-item">
+                <el-select
+                  v-model="searchForm.taskId"
+                  placeholder="选择任务"
+                  clearable
+                  class="search-select"
+                  @change="handleSearch"
+                >
+                  <el-option
+                    v-for="t in taskList"
+                    :key="t.id"
+                    :label="`[${getTaskTypeLabel(t.type)}] ${t.title}`"
+                    :value="t.id"
+                  />
+                </el-select>
+              </el-form-item>
               <el-form-item label="学生姓名" class="search-item">
                 <el-input
                   v-model="searchForm.studentName"
-                  placeholder="请输入学生姓名"
-                  clearable
-                  class="search-input"
-                />
-              </el-form-item>
-              <el-form-item label="任务名称" class="search-item">
-                <el-input
-                  v-model="searchForm.taskTitle"
-                  placeholder="请输入任务名称"
+                  placeholder="学生姓名"
                   clearable
                   class="search-input"
                 />
@@ -121,7 +154,7 @@
                   class="search-select"
                 >
                   <el-option label="已提交" value="SUBMITTED" />
-                  <el-option label="AI批改中" value="AI_PROCESSED" />
+                  <el-option label="AI已批改" value="AI_PROCESSED" />
                   <el-option label="已批改" value="GRADED" />
                 </el-select>
               </el-form-item>
@@ -182,7 +215,7 @@
             </template>
 
             <el-table
-              :data="submissionList"
+              :data="filteredSubmissionList"
               stripe
               border
               :loading="submissionLoading"
@@ -192,6 +225,13 @@
             >
               <el-table-column type="selection" width="50" />
               <el-table-column prop="id" label="ID" width="70" align="center" />
+              <el-table-column label="类型" width="90" align="center">
+                <template #default="{ row }">
+                  <span class="type-tag" :class="'type-' + getTaskType(row.taskId)">
+                    {{ getTaskTypeLabel(getTaskType(row.taskId)) }}
+                  </span>
+                </template>
+              </el-table-column>
               <el-table-column prop="studentName" label="学生姓名" width="120" />
               <el-table-column
                 prop="taskTitle"
@@ -213,6 +253,21 @@
                   }}</el-tag>
                 </template>
               </el-table-column>
+              <el-table-column label="图片" width="70" align="center">
+                <template #default="{ row }">
+                  <el-tooltip :content="row.fileUrl ? '有上传图片' : '纯文本提交，无图片'">
+                    <span :style="{ fontSize: '18px' }">{{ row.fileUrl ? '🖼️' : '📝' }}</span>
+                  </el-tooltip>
+                </template>
+              </el-table-column>
+              <el-table-column label="查重" width="100" align="center">
+                <template #default="{ row }">
+                  <span v-if="row.plagiarismRate === null || row.plagiarismRate === undefined || row.plagiarismRate === 0" class="text-muted">-</span>
+                  <span v-else-if="row.plagiarismRate > 80" style="color:#ef4444;font-weight:700">{{ row.plagiarismRate }}%</span>
+                  <span v-else-if="row.plagiarismRate > 50" style="color:#e6a23c;font-weight:600">{{ row.plagiarismRate }}%</span>
+                  <span v-else style="color:#67c23a;font-weight:600">{{ row.plagiarismRate }}%</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="aiScore" label="AI得分" width="100" align="center">
                 <template #default="{ row }">
                   <span v-if="row.aiScore !== null" class="score-text">{{ row.aiScore }}</span>
@@ -227,33 +282,28 @@
                   <span v-else class="text-muted">-</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="320" align="center" fixed="right">
+              <el-table-column label="操作" width="380" align="center" fixed="right">
                 <template #default="{ row }">
                   <el-button size="small" type="primary" plain link @click="viewDetail(row)">
                     <el-icon><Monitor /></el-icon>
                     查看
                   </el-button>
-                  <el-button
-                    v-if="row.status === 'SUBMITTED'"
-                    size="small"
-                    type="success"
-                    plain
-                    link
-                    @click="aiGrade(row.id)"
-                  >
-                    <el-icon><Cpu /></el-icon>
-                    AI批改
+                  <el-button size="small" type="primary" plain link @click="autoGrade(row.id)">
+                    <el-icon><MagicStick /></el-icon>
+                    AI 批改
                   </el-button>
-                  <el-button
-                    v-if="row.status === 'AI_PROCESSED'"
-                    size="small"
-                    type="warning"
-                    plain
-                    link
-                    @click="teacherGrade(row)"
-                  >
+                  <el-button size="small" type="warning" plain link @click="teacherGrade(row)">
                     <el-icon><Edit /></el-icon>
                     教师复核
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    plain
+                    link
+                    @click="checkStudentPlagiarism(row)"
+                  >
+                    <el-icon><Warning /></el-icon>查重
                   </el-button>
                   <el-popconfirm
                     title="确定要删除吗？"
@@ -316,9 +366,52 @@
           </div>
         </div>
 
+        <!-- 上传图片预览 -->
+        <div v-if="detailData.fileUrl" class="detail-section">
+          <div class="section-title">
+            📷 上传图片
+            <span v-if="layoutData" style="font-size: 12px; color: #8b5cf6; margin-left: 10px">
+              (纸面检测: {{ layoutData.layout_boxes?.length || 0 }} 区域,
+              {{ layoutData.ocr_regions?.length || 0 }} OCR)
+            </span>
+          </div>
+          <div class="detail-image-wrapper">
+            <img
+              :src="'http://localhost:8081/' + detailData.fileUrl.replace(/\\/g, '/')"
+              class="detail-preview-image"
+              ref="detailImgRef"
+              @load="onDetailImgLoad"
+              @error="(e) => (e.target.style.display = 'none')"
+            />
+            <canvas
+              ref="detailCanvasRef"
+              class="detail-canvas-overlay"
+              v-show="layoutData"
+            ></canvas>
+            <div v-if="layoutData" class="layout-legend">
+              <span
+                v-for="cat in detailLegend"
+                :key="cat.label"
+                class="legend-tag"
+                :style="{ background: cat.bg, color: cat.color, borderColor: cat.color }"
+              >
+                {{ cat.name }}: {{ cat.count }}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div v-if="detailData.ocrRawText" class="detail-section">
           <div class="section-title">OCR识别结果</div>
-          <div class="detail-content-box">
+          <div v-if="layoutData && layoutData.ocr_regions" class="ocr-regions-grid">
+            <div v-for="(region, ri) in layoutData.ocr_regions" :key="ri" class="ocr-region-card">
+              <div class="ocr-region-label">{{ region.box.label }} #{{ ri + 1 }}</div>
+              <canvas :ref="(el) => setRegionCanvas(ri, el)" class="ocr-region-canvas"></canvas>
+              <div class="ocr-region-text">{{ region.ocr_text || '(空)' }}</div>
+              <div class="ocr-region-conf">{{ (region.ocr_confidence * 100).toFixed(0) }}%</div>
+            </div>
+          </div>
+          <div v-else class="detail-content-box">
             {{ detailData.ocrRawText }}
           </div>
         </div>
@@ -348,6 +441,27 @@
           <div class="section-title">AI评语</div>
           <div class="detail-content-box">
             {{ detailData.aiComment }}
+          </div>
+        </div>
+
+        <div
+          class="detail-grid"
+          v-if="detailData.plagiarismRate !== null || detailData.isCheated === 1"
+        >
+          <div class="detail-item">
+            <span class="detail-label">抄袭检测率</span>
+            <span
+              class="detail-value"
+              :style="{ color: detailData.plagiarismRate > 50 ? '#f56c6c' : '#67c23a' }"
+            >
+              {{ detailData.plagiarismRate }}%
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">作弊判定</span>
+            <el-tag :type="detailData.isCheated === 1 ? 'danger' : 'success'" size="small">
+              {{ detailData.isCheated === 1 ? '⚠ 疑似作弊' : '✓ 正常' }}
+            </el-tag>
           </div>
         </div>
 
@@ -408,10 +522,36 @@
           />
         </el-form-item>
         <el-form-item label="任务类型" prop="type">
-          <el-select v-model="taskForm.type" placeholder="请选择任务类型" style="width: 100%">
-            <el-option label="普通作业" value="HOMEWORK" />
-            <el-option label="在线测评" value="EXAM" />
-            <el-option label="实训项目" value="PRACTICE" />
+          <el-select
+            v-model="taskForm.type"
+            placeholder="请选择任务类型"
+            style="width: 100%"
+            @change="onTaskTypeChange"
+          >
+            <el-option label="📝 普通作业（文本/DeepSeek判分）" value="HOMEWORK" />
+            <el-option label="📋 选择题作业（答题卡+OCR批改）" value="CHOICE" />
+            <el-option label="📄 在线测评（关联试卷）" value="EXAM" />
+            <el-option label="🔬 实训项目" value="PRACTICE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="taskForm.type === 'CHOICE'" label="答案模板" prop="answerTemplate">
+          <el-input
+            v-model="taskForm.answerTemplate"
+            placeholder="[ANSWERS:B,D,A,C,B,A,D,C] 每道题的标准答案"
+            maxlength="200"
+          />
+          <span style="font-size: 11px; color: #909399; margin-top: 4px"
+            >格式: [ANSWERS:B,D,A,C] 每个字母对应一道选择题的正确答案</span
+          >
+        </el-form-item>
+        <el-form-item v-if="taskForm.type === 'EXAM'" label="关联试卷" prop="paperId">
+          <el-select
+            v-model="taskForm.paperId"
+            placeholder="选择试卷（可选）"
+            style="width: 100%"
+            clearable
+          >
+            <el-option v-for="p in paperList" :key="p.id" :label="p.title" :value="p.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="课程选择" prop="courseId">
@@ -462,7 +602,98 @@
         >
       </template>
     </el-dialog>
+
+    <!-- 查重结果行内面板 -->
+    <div v-if="plagiarismReport" class="plagiarism-panel">
+      <div class="plagiarism-panel-header">
+        <span>🔍 抄袭检测 — 任务 {{ plagiarismReport.taskId }}</span>
+        <span>{{ plagiarismReport.totalStudents }}人 {{ plagiarismReport.totalPairs }}对</span>
+        <span :style="{ color: plagiarismReport.anySuspicious ? '#ef4444' : '#10b981' }">
+          {{
+            plagiarismReport.anySuspicious
+              ? '⚠ ' + plagiarismReport.comparisons.filter((p) => p.alert).length + '对疑似抄袭'
+              : '✅ 未发现抄袭'
+          }}
+        </span>
+        <el-button size="small" text @click="plagiarismReport = null">✕ 关闭</el-button>
+      </div>
+      <div class="plagiarism-pairs">
+        <div
+          v-for="(p, i) in plagiarismReport.comparisons"
+          :key="i"
+          class="plagiarism-pair"
+          :class="{ alert: p.alert }"
+          @click="togglePlagiarismDetail(i)"
+        >
+          <span class="pair-a">{{ p.studentA }}</span>
+          <div class="pair-bar">
+            <div
+              class="pair-fill"
+              :style="{
+                width: p.similarity + '%',
+                background: p.alert ? '#ef4444' : p.similarity > 50 ? '#e6a23c' : '#67c23a'
+              }"
+            ></div>
+          </div>
+          <span class="pair-b">{{ p.studentB }}</span>
+          <span class="pair-pct">{{ Math.round(p.similarity) }}%</span>
+          <span v-if="p.alert" class="pair-badge">⚠</span>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- 查重结果弹窗 -->
+  <el-dialog v-model="plagiarismVisible" :title="'查重结果：' + plagiarismStudentName" width="720px" destroy-on-close>
+    <!-- 提示 -->
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:12px;padding:6px 10px;background:#f8fafc;border-radius:6px">
+      基于 版面检测 + 手写识别 → Jaccard Bigram 文本相似度比对
+    </div>
+    <!-- Loading -->
+    <div v-if="plagiarismLoading" style="text-align:center;padding:40px">
+      <el-icon class="is-loading" style="font-size:28px;color:#3b82f6"><Loading /></el-icon>
+      <p style="color:#94a3b8;margin-top:12px">正在识别并比对...</p>
+    </div>
+    <!-- 空 -->
+    <div v-else-if="!plagiarismResult || (!plagiarismResult.results || plagiarismResult.results.length === 0)" style="text-align:center;padding:30px;color:#94a3b8">
+      ✅ 未发现相似提交
+    </div>
+    <!-- 结果 -->
+    <div v-else>
+      <div style="display:flex;gap:20px;margin-bottom:10px;font-size:13px;color:#475569">
+        <span>已检测 <strong>{{ plagiarismResult.checkedCount }}</strong> 份提交</span>
+        <span>最高相似度 <strong :style="{color: plagiarismResult.maxSimilarity > 80 ? '#ef4444' : '#10b981'}">{{ plagiarismResult.maxSimilarity }}%</strong></span>
+        <el-tag v-if="plagiarismResult.currentCheated" type="danger" size="small">⚠ 疑似抄袭</el-tag>
+      </div>
+      <div v-for="(p, i) in plagiarismResult.results" :key="i" class="plagiarism-match" style="padding:10px;margin-bottom:8px;background:#f8fafc;border-radius:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-weight:600;color:#334155;min-width:100px">{{ p.studentName }}</span>
+          <el-progress :percentage="p.similarity" :stroke-width="8"
+            :color="p.similarity > 80 ? '#ef4444' : p.similarity > 50 ? '#e6a23c' : '#67c23a'"
+            style="flex:1" />
+          <span style="font-weight:700;font-size:13px">{{ p.similarity }}%</span>
+          <el-tag v-if="p.similarity > 80" type="danger" size="small">疑似抄袭</el-tag>
+          <el-tag v-else-if="p.similarity > 50" type="warning" size="small">可疑</el-tag>
+          <el-button size="small" text type="primary" @click="showPlagiarismCompare(p)">对比</el-button>
+        </div>
+      </div>
+    </div>
+  </el-dialog>
+
+  <!-- 文本对比弹窗 -->
+  <el-dialog v-model="plagiarismCompareVisible" title="文本对比" width="800px" destroy-on-close>
+    <div v-if="plagiarismCompareData" style="display:flex;gap:16px">
+      <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px">
+        <div style="font-weight:600;color:#2563eb;margin-bottom:8px">{{ plagiarismStudentName }}（当前）</div>
+        <div style="font-size:13px;color:#334155;white-space:pre-wrap;max-height:400px;overflow-y:auto;line-height:1.6">{{ plagiarismCompareData.sourceText }}</div>
+      </div>
+      <div style="display:flex;align-items:center;font-weight:700;color:#94a3b8;flex-shrink:0">VS</div>
+      <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px">
+        <div style="font-weight:600;color:#dc2626;margin-bottom:8px">{{ plagiarismCompareData.studentName }}</div>
+        <div style="font-size:13px;color:#334155;white-space:pre-wrap;max-height:400px;overflow-y:auto;line-height:1.6">{{ plagiarismCompareData.compareText }}</div>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -477,7 +708,10 @@ import {
   Delete,
   Plus,
   Collection,
-  DocumentChecked
+  DocumentChecked,
+  MagicStick,
+  Warning,
+  Loading
 } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { fetchSubmissionList, deleteSubmission } from '@/api/submission'
@@ -527,14 +761,69 @@ const taskForm = reactive({
   courseId: null,
   classId: null,
   contentText: '',
-  deadline: ''
+  deadline: '',
+  answerTemplate: '',
+  paperId: null
 })
+
+const paperList = ref([])
+
+async function loadPaperList() {
+  try {
+    const res = await request.get('/api/papers')
+    paperList.value = Array.isArray(res.data) ? res.data : []
+  } catch {}
+}
+
+function onTaskTypeChange(type) {
+  if (type === 'CHOICE') {
+    taskForm.answerTemplate = '[ANSWERS:B,D,A,C,B,A,D,C]'
+  }
+  if (type !== 'EXAM') {
+    taskForm.paperId = null
+  }
+}
+
+// 构建提交数据
+function buildTaskData() {
+  const data = {
+    title: taskForm.title,
+    type: taskForm.type,
+    courseId: taskForm.courseId,
+    classId: taskForm.classId,
+    contentText: taskForm.contentText,
+    deadline: taskForm.deadline
+  }
+  if (taskForm.type === 'CHOICE') {
+    data.contentText = taskForm.answerTemplate + '\n' + taskForm.contentText
+  }
+  if (taskForm.type === 'EXAM' && taskForm.paperId) {
+    data.paperId = taskForm.paperId
+  }
+  return data
+}
 
 // 搜索表单
 const searchForm = reactive({
   studentName: '',
-  taskTitle: '',
+  taskId: null,
   status: ''
+})
+const typeFilter = ref('')
+
+// 根据类型筛选任务列表
+const filteredTaskList = computed(() => {
+  if (!typeFilter.value) return taskList.value
+  return taskList.value.filter((t) => t.type === typeFilter.value)
+})
+
+// 根据任务类型过滤提交列表
+const filteredSubmissionList = computed(() => {
+  if (!typeFilter.value) return submissionList.value
+  return submissionList.value.filter((s) => {
+    const t = taskList.value.find((t) => t.id === s.taskId)
+    return t?.type === typeFilter.value
+  })
 })
 
 // 分页
@@ -575,10 +864,11 @@ const taskRules = {
 
 // 计算统计数据
 const stats = computed(() => {
-  const total = submissionList.value.length
-  const submitted = submissionList.value.filter((s) => s.status === SUBMITTED).length
-  const aiProcessed = submissionList.value.filter((s) => s.status === AI_PROCESSED).length
-  const graded = submissionList.value.filter((s) => s.status === GRADED).length
+  const list = filteredSubmissionList.value
+  const total = list.length
+  const submitted = list.filter((s) => s.status === SUBMITTED).length
+  const aiProcessed = list.filter((s) => s.status === AI_PROCESSED).length
+  const graded = list.filter((s) => s.status === GRADED).length
   return { total, submitted, aiProcessed, graded }
 })
 
@@ -713,14 +1003,7 @@ async function handleCreateTask() {
     if (valid) {
       taskSubmitLoading.value = true
       try {
-        const data = {
-          title: taskForm.title,
-          type: taskForm.type,
-          courseId: taskForm.courseId,
-          classId: taskForm.classId,
-          contentText: taskForm.contentText,
-          deadline: taskForm.deadline
-        }
+        const data = buildTaskData()
         const res = await createTask(data)
         if (res.code === 200) {
           ElMessage.success('作业布置成功')
@@ -768,16 +1051,12 @@ function getTaskTypeTag(type) {
 }
 
 function getTaskTypeLabel(type) {
-  switch (type) {
-    case 'HOMEWORK':
-      return '普通作业'
-    case 'EXAM':
-      return '在线测评'
-    case 'PRACTICE':
-      return '实训项目'
-    default:
-      return type
-  }
+  const map = { HOMEWORK: '普通作业', CHOICE: '选择题', EXAM: '卷子', PRACTICE: '实训' }
+  return map[type] || type || '未知'
+}
+function getTaskType(taskId) {
+  const t = taskList.value.find((t) => t.id === taskId)
+  return t?.type || ''
 }
 
 // ==================== 作业提交管理 ====================
@@ -855,24 +1134,203 @@ function getStatusLabel(status) {
   }
 }
 
-function viewDetail(row) {
-  detailData.value = row
-  detailVisible.value = true
+// 版面检测可视化
+const detailCanvasRef = ref(null)
+const detailImgRef = ref(null)
+const layoutData = ref(null)
+const detailLegend = ref([])
+
+const LAYOUT_COLORS = {
+  Text: { bg: '#dbeafe', color: '#2563eb' },
+  Title: { bg: '#ede9fe', color: '#7c3aed' },
+  Header: { bg: '#fef3c7', color: '#d97706' },
+  Footer: { bg: '#e0e7ff', color: '#4f46e5' },
+  Figure: { bg: '#fce7f3', color: '#db2777' },
+  Table: { bg: '#d1fae5', color: '#059669' },
+  'Table caption': { bg: '#ecfdf5', color: '#10b981' },
+  Equation: { bg: '#fef9c3', color: '#ca8a04' },
+  Reference: { bg: '#f1f5f9', color: '#64748b' }
 }
 
-async function aiGrade(id) {
+function parseLayoutData() {
   try {
-    ElMessage.info('正在进行AI批改，请稍候...')
-    const res = await request.post(`/api/submission/ai-grade/${id}`)
+    const raw = detailData.value?.ocrRawText
+    if (raw && raw.startsWith('{') && raw.includes('layout_boxes')) {
+      return JSON.parse(raw)
+    }
+  } catch {}
+  return null
+}
+
+function onDetailImgLoad() {
+  // 图片加载完成后，如果有版面数据，渲染 Canvas 叠加层
+  if (!layoutData.value || !detailImgRef.value || !detailCanvasRef.value) return
+
+  const img = detailImgRef.value
+  const canvas = detailCanvasRef.value
+  const data = layoutData.value
+
+  // Canvas 覆盖在图片上，匹配图片显示尺寸
+  const rect = img.getBoundingClientRect()
+  const wrapper = img.parentElement
+  const wrapperRect = wrapper.getBoundingClientRect()
+
+  canvas.style.position = 'absolute'
+  canvas.style.left = rect.left - wrapperRect.left + 'px'
+  canvas.style.top = rect.top - wrapperRect.top + 'px'
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  canvas.style.width = rect.width + 'px'
+  canvas.style.height = rect.height + 'px'
+
+  const ctx = canvas.getContext('2d')
+
+  data.layout_boxes.forEach((box) => {
+    const x = box.x1,
+      y = box.y1,
+      w = box.x2 - box.x1,
+      h = box.y2 - box.y1
+    const colors = LAYOUT_COLORS[box.label] || { color: '#94a3b8', bg: '#f1f5f9' }
+    ctx.fillStyle = colors.bg + '60'
+    ctx.fillRect(x, y, w, h)
+    ctx.strokeStyle = colors.color
+    ctx.lineWidth = 2
+    ctx.strokeRect(x, y, w, h)
+    // 标签
+    const label = `${box.label} ${Math.round((box.confidence || 0) * 100)}%`
+    ctx.font = '11px "PingFang SC","Microsoft YaHei",sans-serif'
+    const tm = ctx.measureText(label)
+    ctx.fillStyle = colors.color
+    ctx.fillRect(x, Math.max(0, y - 18), tm.width + 8, 18)
+    ctx.fillStyle = '#fff'
+    ctx.fillText(label, x + 4, Math.max(12, y - 5))
+  })
+
+  // 统计图例
+  const counts = {}
+  data.layout_boxes.forEach((b) => {
+    counts[b.label] = (counts[b.label] || 0) + 1
+  })
+  detailLegend.value = Object.entries(counts).map(([label, count]) => ({
+    label,
+    name: label,
+    count,
+    bg: (LAYOUT_COLORS[label] || { bg: '#f1f5f9' }).bg,
+    color: (LAYOUT_COLORS[label] || { color: '#94a3b8' }).color
+  }))
+
+  // 渲染裁剪区域缩略图
+  setTimeout(() => renderRegionThumbnails(), 100)
+}
+
+// 裁剪区域缩略图
+const regionCanvases = ref({})
+function setRegionCanvas(idx, el) {
+  if (el) regionCanvases.value[idx] = el
+}
+
+function renderRegionThumbnails() {
+  if (!layoutData.value?.ocr_regions || !detailImgRef.value) return
+  const img = detailImgRef.value
+
+  layoutData.value.ocr_regions.forEach((region, idx) => {
+    const canvas = regionCanvases.value[idx]
+    if (!canvas) return
+    const box = region.box
+    const x = box.x1,
+      y = box.y1,
+      w = box.x2 - box.x1,
+      h = box.y2 - box.y1
+    if (w <= 0 || h <= 0) return
+
+    // 计算缩放
+    const scaleX = img.naturalWidth / img.clientWidth
+    const scaleY = img.naturalHeight / img.clientHeight
+    const sx = x,
+      sy = y,
+      sw = w,
+      sh = h
+
+    canvas.width = 120
+    canvas.height = Math.min(80, sh * (120 / sw))
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+    // 边框
+    ctx.strokeStyle = '#3b82f6'
+    ctx.lineWidth = 2
+    ctx.strokeRect(0, 0, canvas.width, canvas.height)
+  })
+}
+
+function viewDetail(row) {
+  detailData.value = row
+  layoutData.value = parseLayoutData()
+  detailLegend.value = []
+  regionCanvases.value = {}
+  detailVisible.value = true
+  if (layoutData.value) {
+    // 等 DOM 渲染完成后渲染 Canvas
+    setTimeout(() => {
+      const img = detailImgRef.value
+      if (img) {
+        if (img.complete) {
+          onDetailImgLoad()
+          renderRegionThumbnails()
+        } else {
+          img.addEventListener(
+            'load',
+            () => {
+              onDetailImgLoad()
+              renderRegionThumbnails()
+            },
+            { once: true }
+          )
+        }
+      }
+    }, 400)
+  }
+}
+
+/**
+ * AI 批改
+ * OCR识别 + 题型匹配评分 + DeepSeek AI评语 + 抄袭检测
+ */
+async function autoGrade(id) {
+  const row = submissionList.value.find((s) => s.id === id)
+  if (row && !row.fileUrl) {
+    try {
+      await ElMessageBox.confirm(
+        '该提交没有上传图片文件，无法进行OCR识别和版面抄袭检测。AI将仅基于文本内容批改，请确认。',
+        '⚠️ 无图片文件 — 无法OCR',
+        { confirmButtonText: '仍然批改', cancelButtonText: '取消', type: 'warning' }
+      )
+    } catch {
+      return
+    }
+  }
+
+  try {
+    ElMessage.info('正在进行AI全自动批改（含OCR+抄袭检测），请稍候...')
+    const res = await request.post(`/api/submission/auto-grade/${id}`)
     if (res.code === 200) {
-      ElMessage.success('AI批改完成')
+      const submission = res.data
+      let msg = 'AI全自动批改完成'
+      if (submission.isCheated === 1) {
+        msg += ' — ⚠️ 检测到疑似抄袭'
+      }
+      if (submission.aiComment && submission.aiComment.includes('无图片')) {
+        ElMessage.warning(msg + '（无图片，仅基于文本）')
+      } else {
+        ElMessage.success(msg)
+      }
       loadSubmissionList()
     } else {
-      ElMessage.error(res.msg || 'AI批改失败')
+      ElMessage.error(res.msg || 'AI全自动批改失败')
     }
   } catch (error) {
-    console.error('AI批改失败:', error)
-    const errorMsg = error.response?.data?.msg || error.message || 'AI批改失败，请稍后重试'
+    if (error === 'cancel') return
+    console.error('AI全自动批改失败:', error)
+    const errorMsg = error.response?.data?.msg || error.message || 'AI全自动批改失败，请稍后重试'
     ElMessage.error(errorMsg)
   }
 }
@@ -899,7 +1357,7 @@ async function batchAiGrade() {
     let successCount = 0
     for (const id of selectedIds.value) {
       try {
-        const res = await request.post(`/api/submission/ai-grade/${id}`)
+        const res = await request.post(`/api/submission/auto-grade/${id}`)
         if (res.code === 200) {
           successCount++
         }
@@ -957,6 +1415,46 @@ async function handleTeacherGrade() {
   })
 }
 
+// 音频播放
+// 抄袭检测
+const plagiarismVisible = ref(false)
+const plagiarismStudentName = ref('')
+const plagiarismLoading = ref(false)
+const plagiarismResult = ref(null)
+const plagiarismCompareVisible = ref(false)
+const plagiarismCompareData = ref(null)
+
+async function checkStudentPlagiarism(row) {
+  plagiarismStudentName.value = row.studentName
+  plagiarismResult.value = null
+  plagiarismLoading.value = true
+  plagiarismVisible.value = true
+  try {
+    const res = await request.post('/api/plagiarism/check-by-submission/' + row.id)
+    if (res.code === 200) {
+      plagiarismResult.value = res.data
+      loadSubmissionList()
+    }
+  } catch (e) {
+    ElMessage.error('查重服务异常')
+  } finally {
+    plagiarismLoading.value = false
+  }
+}
+
+function showPlagiarismCompare(pair) {
+  plagiarismCompareData.value = pair
+  plagiarismCompareVisible.value = true
+}
+
+function cleanOcrText(raw) {
+  if (!raw) return '(无内容)'
+  if (raw.startsWith('{')) {
+    try { const j = JSON.parse(raw); return j.combined_text || j.note || raw } catch {}
+  }
+  return raw
+}
+
 async function handleDelete(row) {
   try {
     const res = await deleteSubmission(row.id)
@@ -975,6 +1473,7 @@ async function handleDelete(row) {
 // 初始化
 onMounted(() => {
   loadTaskList()
+  loadPaperList()
 })
 </script>
 
@@ -1081,6 +1580,57 @@ onMounted(() => {
 .btn-primary-custom span {
   color: #ffffff;
   font-weight: 600;
+}
+
+/* ==================== 类型 Tab ==================== */
+.type-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.type-tab {
+  padding: 8px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.type-tab:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+.type-tab.active {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+}
+
+.type-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.type-HOMEWORK {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.type-CHOICE {
+  background: #fef3c7;
+  color: #d97706;
+}
+.type-EXAM {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.type-PRACTICE {
+  background: #d1fae5;
+  color: #059669;
 }
 
 /* ==================== 搜索区域 ==================== */
@@ -1283,9 +1833,176 @@ onMounted(() => {
   min-height: 60px;
 }
 
+/* 图片预览 */
+.detail-image-wrapper {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  max-height: 400px;
+  overflow: auto;
+}
+.detail-image-wrapper {
+  position: relative;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  max-height: 500px;
+  overflow: auto;
+}
+.detail-canvas-overlay {
+  pointer-events: none;
+  border-radius: 4px;
+}
+/* OCR 区域卡片 */
+.ocr-regions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.ocr-region-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  width: 140px;
+}
+.ocr-region-label {
+  font-size: 11px;
+  color: #3b82f6;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ocr-region-canvas {
+  width: 120px;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.ocr-region-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-top: 4px;
+  font-family: 'Courier New', monospace;
+}
+.ocr-region-conf {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.layout-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  justify-content: center;
+}
+.legend-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-weight: 500;
+}
+.detail-preview-image {
+  max-width: 100%;
+  max-height: 380px;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+  margin: 0 auto;
+}
+.image-fallback-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #e6a23c;
+  background: #fdf6ec;
+  padding: 6px 12px;
+  border-radius: 4px;
+}
+
 /* ==================== 表单排版 ==================== */
 .task-form,
 .grade-form {
   padding-right: 20px;
+}
+
+/* 抄袭检测行内面板 */
+.plagiarism-panel {
+  margin-top: 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.plagiarism-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #475569;
+}
+.plagiarism-pairs {
+  padding: 8px 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.plagiarism-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.plagiarism-pair:hover {
+  background: #f1f5f9;
+}
+.plagiarism-pair.alert {
+  background: #fef2f2;
+}
+.plagiarism-pair.alert:hover {
+  background: #fee2e2;
+}
+.pair-a,
+.pair-b {
+  font-size: 13px;
+  color: #334155;
+  min-width: 80px;
+}
+.pair-a {
+  text-align: right;
+}
+.pair-bar {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pair-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s;
+}
+.pair-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  min-width: 36px;
+  text-align: center;
+}
+.pair-badge {
+  font-size: 14px;
 }
 </style>

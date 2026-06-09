@@ -31,14 +31,19 @@ async function handlePublish() {
   publishing.value = true
   msg.value = ''
   try {
-    await publishNotice({
+    const res = await publishNotice({
       teacherId: Number(auth.teacherId) || 1,
       title: form.value.title,
       content: form.value.content
     })
-    speakNotice(form.value.title, form.value.content)
+    // 播放服务器生成的 TTS 音频
+    const ttsUrl = res?.ttsAudioUrl
+    if (ttsUrl && !ttsUrl.startsWith('client://')) {
+      const audio = new Audio('http://localhost:8081/' + ttsUrl)
+      audio.play().catch(() => {})
+    }
     form.value = { title: '', content: '' }
-    msg.value = '发布成功，已触发 TTS 语音播报'
+    msg.value = '发布成功（DashScope TTS 语音已生成）'
     await load()
   } catch (e) {
     msg.value = e.message
@@ -47,13 +52,50 @@ async function handlePublish() {
   }
 }
 
+const audioRef = ref(null)
+
 function replay(notice) {
+  // 如果正在播放同一条，则停止
   if (speakingId.value === notice.id) {
+    if (audioRef.value) {
+      audioRef.value.pause()
+      audioRef.value = null
+    }
     window.speechSynthesis.cancel()
     speakingId.value = null
     return
   }
+
+  // 停止之前的播放
+  if (audioRef.value) {
+    audioRef.value.pause()
+    audioRef.value = null
+  }
   window.speechSynthesis.cancel()
+
+  // 优先使用服务器生成的 TTS 音频文件
+  const ttsUrl = notice.ttsAudioUrl
+  if (ttsUrl && ttsUrl !== 'client://speechSynthesis' && !ttsUrl.startsWith('client://')) {
+    const audio = new Audio('http://localhost:8081/' + ttsUrl)
+    speakingId.value = notice.id
+    audio.onended = () => {
+      speakingId.value = null
+      audioRef.value = null
+    }
+    audio.onerror = () => {
+      console.warn('服务器TTS音频播放失败，回退到浏览器语音')
+      fallbackBrowserSpeech(notice)
+    }
+    audio.play()
+    audioRef.value = audio
+    return
+  }
+
+  // 回退到浏览器内置语音合成
+  fallbackBrowserSpeech(notice)
+}
+
+function fallbackBrowserSpeech(notice) {
   speakingId.value = notice.id
   const text = `${notice.title}。${notice.content}`
   const utterance = new SpeechSynthesisUtterance(text)

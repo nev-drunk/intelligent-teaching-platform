@@ -61,42 +61,46 @@ public class SubmissionController {
      */
     @PostMapping("/upload")
     public ApiResponse<Submission> uploadSubmission(
-            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "file", required = false) MultipartFile file,
             @RequestParam("taskId") Long taskId,
             @RequestParam("studentId") Long studentId,
-            @RequestParam("studentName") String studentName) {
+            @RequestParam("studentName") String studentName,
+            @RequestParam(value = "submitText", required = false) String submitText) {
 
-        // 1. 参数校验
-        if (file == null || file.isEmpty()) {
-            return ApiResponse.fail(400, "请选择要上传的文件");
+        // 1. 参数校验：至少要有文件或文本
+        if ((file == null || file.isEmpty()) && (submitText == null || submitText.isBlank())) {
+            return ApiResponse.fail(400, "请选择要上传的文件或输入提交文本");
         }
 
-        // 2. 检查文件类型
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || !isAllowedExtension(originalFilename)) {
-            return ApiResponse.fail(400, "只允许上传图片文件（jpg, jpeg, png, gif, bmp）");
+        // 2. 保存文件（如果有的话）
+        String fileUrl = null;
+        if (file != null && !file.isEmpty()) {
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || !isAllowedExtension(originalFilename)) {
+                return ApiResponse.fail(400, "只允许上传图片文件（jpg, jpeg, png, gif, bmp）");
+            }
+            try {
+                fileUrl = saveFile(file);
+                log.info("文件上传成功: {}", fileUrl);
+            } catch (IOException e) {
+                log.error("文件保存失败", e);
+                return ApiResponse.fail(500, "文件保存失败");
+            }
         }
 
-        // 3. 保存文件
-        String fileUrl;
-        try {
-            fileUrl = saveFile(file);
-            log.info("文件上传成功: {}", fileUrl);
-        } catch (IOException e) {
-            log.error("文件保存失败", e);
-            return ApiResponse.fail(500, "文件保存失败");
-        }
-
-        // 4. 创建提交记录
+        // 3. 创建提交记录
         Submission submission = new Submission();
         submission.setTaskId(taskId);
         submission.setStudentId(studentId);
         submission.setStudentName(studentName);
         submission.setFileUrl(fileUrl);
+        if (submitText != null && !submitText.isBlank()) {
+            submission.setSubmitText(submitText);
+        }
         submission.setStatus(SubmissionService.STATUS_SUBMITTED);
         submission.setSubmitTime(LocalDateTime.now());
 
-        // 5. 保存到数据库
+        // 4. 保存到数据库
         Submission savedSubmission = submissionService.saveSubmission(submission);
         log.info("提交记录创建成功，ID: {}", savedSubmission.getId());
 
@@ -104,57 +108,86 @@ public class SubmissionController {
     }
 
     /**
-     * 触发AI自动批改
-     * 
-     * POST /api/submission/ai-grade/{id}
-     * 
-     * @param id 提交记录ID
-     * @return 批改后的提交记录
+     * AI全自动批改（唯一入口）
+     * 包含: OCR识别 + 标准答案比对 + DeepSeek评语 + 抄袭痕迹检测
+     *
+     * POST /api/submission/auto-grade/{id}
      */
-    @PostMapping("/ai-grade/{id}")
-    public ApiResponse<Submission> aiGrade(@PathVariable Long id) {
+    @PostMapping("/auto-grade/{id}")
+    public ApiResponse<Submission> autoGrade(@PathVariable Long id) {
         try {
-            Submission submission = submissionService.aiBatchProcess(id);
-            return ApiResponse.ok("AI批改完成", submission);
+            Submission submission = submissionService.autoGrade(id);
+            return ApiResponse.ok("AI全自动批改完成", submission);
         } catch (BusinessException e) {
-            log.warn("AI批改失败: {}", e.getMessage());
+            log.warn("AI全自动批改失败: {}", e.getMessage());
             return ApiResponse.fail(e.getCode(), e.getMessage());
         } catch (Exception e) {
-            log.error("AI批改异常", e);
-            return ApiResponse.fail(500, "AI批改异常，请稍后重试");
+            log.error("AI全自动批改异常", e);
+            return ApiResponse.fail(500, "AI全自动批改异常，请稍后重试");
+        }
+    }
+
+    /**
+     * 教师最终复核（含 TTS 语音评语合成）
+     *
+     * POST /api/submission/grade/{submissionId}
+     *
+     * @param submissionId 提交记录ID
+     * @param request 教师批改请求
+     * @return 更新后的提交记录
+     */
+    @PostMapping("/grade/{submissionId}")
+    public ApiResponse<Submission> gradeSubmission(@PathVariable Long submissionId,
+                                                    @RequestBody TeacherGradeRequest request) {
+        try {
+            Submission submission = submissionService.saveTeacherGrade(
+                    submissionId,
+                    request.getTeacherScore(),
+                    request.getTeacherComment()
+            );
+
+            log.info("教师复核完成（含TTS），提交ID: {}, 评分: {}",
+                    submissionId, request.getTeacherScore());
+
+            return ApiResponse.ok("批改完成（含TTS语音评语）", submission);
+        } catch (BusinessException e) {
+            log.warn("教师复核失败: {}", e.getMessage());
+            return ApiResponse.fail(e.getCode(), e.getMessage());
+        } catch (Exception e) {
+            log.error("教师复核异常", e);
+            return ApiResponse.fail(500, "复核失败，请稍后重试");
         }
     }
 
     /**
      * 教师最终复核
-     * 
+     *
      * PUT /api/submission/teacher-grade
-     * 
+     *
      * @param request 教师批改请求
      * @return 更新后的提交记录
      */
     @PutMapping("/teacher-grade")
     public ApiResponse<Submission> teacherGrade(@RequestBody TeacherGradeRequest request) {
-        // 参数校验
         if (request.getSubmissionId() == null) {
             return ApiResponse.fail(400, "提交记录ID不能为空");
         }
 
         try {
-            Submission submission = submissionService.updateComment(
+            // 使用 saveTeacherGrade（含 TTS 语音评语合成）
+            Submission submission = submissionService.saveTeacherGrade(
                     request.getSubmissionId(),
-                    request.getTeacherComment(),
-                    request.getTeacherScore()
+                    request.getTeacherScore(),
+                    request.getTeacherComment()
             );
 
-            if (submission == null) {
-                return ApiResponse.fail(404, "提交记录不存在");
-            }
-
-            log.info("教师批改完成，提交ID: {}, 评分: {}", 
+            log.info("教师批改完成，提交ID: {}, 评分: {}",
                     request.getSubmissionId(), request.getTeacherScore());
 
-            return ApiResponse.ok("批改完成", submission);
+            return ApiResponse.ok("批改完成（含TTS语音评语）", submission);
+        } catch (BusinessException e) {
+            log.warn("教师批改失败: {}", e.getMessage());
+            return ApiResponse.fail(e.getCode(), e.getMessage());
         } catch (Exception e) {
             log.error("教师批改异常", e);
             return ApiResponse.fail(500, "批改失败，请稍后重试");

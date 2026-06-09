@@ -19,6 +19,9 @@
         <result column="teacher_comment" property="teacherComment"/>
         <result column="status" property="status"/>
         <result column="submit_time" property="submitTime"/>
+        <result column="plagiarism_rate" property="plagiarismRate"/>
+        <result column="is_cheated" property="isCheated"/>
+        <result column="ai_review_voice_url" property="aiReviewVoiceUrl"/>
         <result column="task_title" property="taskTitle"/>
         <result column="course_name" property="courseName"/>
     </resultMap>
@@ -29,16 +32,19 @@
             s.id, 
             s.task_id, 
             s.student_id, 
-            st.student_name, 
+            COALESCE(st.student_name, s.student_name) as student_name,
             s.submit_text, 
             s.file_url, 
             s.ocr_raw_text, 
             s.ai_score, 
             s.ai_comment,
-            s.teacher_score, 
-            s.teacher_comment, 
-            s.status, 
+            s.teacher_score,
+            s.teacher_comment,
+            s.status,
             s.submit_time,
+            s.plagiarism_rate,
+            s.is_cheated,
+            s.ai_review_voice_url,
             t.title as task_title,
             c.course_name
         FROM tb_submission s

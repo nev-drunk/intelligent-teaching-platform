@@ -1,0 +1,13 @@
+flask>=3.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+onnxruntime>=1.16.0
+torch>=2.0.0
+transformers>=4.30.0
+ultralytics>=8.0.0
+Pillow>=10.0.0
+edge-tts>=6.1.0
+dashscope>=1.20.0
+scikit-image>=0.21.0
+scipy>=1.11.0
+requests>=2.31.0

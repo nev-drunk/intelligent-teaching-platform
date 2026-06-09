@@ -24,6 +24,11 @@ __pycache__/
 venv/
 env/
 
+# 环境变量文件（包含 API 密钥等敏感信息）
+.env
+.env.local
+.env.*.local
+
 # 💥 绝对不要把模型文件推上 Git
 models/
 *.pt
@@ -32,6 +37,9 @@ models/
 *.bin
 *.pkl
 *.tar
+*.h5
+*.keras
+*.safetensors
 
 # 忽略 AI 服务或测试生成的临时多媒体文件（避免误伤前端 src 下的素材）
 ai-service/**/*.mp3

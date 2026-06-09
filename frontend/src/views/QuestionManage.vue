@@ -915,6 +915,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { listQuestions, aiGenerate, saveQuestion } from '@/api/question'
 import { listPapers, publishPaper, getPaper } from '@/api/paper'
+import request from '@/api/request'
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const currentTeacherId = ref(1)
@@ -1139,6 +1140,26 @@ async function handleAdd() {
     showToast('请填写标准答案', 'error')
     return
   }
+
+  // ── AI 查重检测 ──
+  try {
+    const dupRes = await request.post('/api/questions/check-duplicate', {
+      content: form.value.content,
+      courseId: courseId.value
+    })
+    if (dupRes.code === 200 && dupRes.data?.length > 0) {
+      const topItem = dupRes.data[0]
+      if (topItem.score > 0.8) {
+        const confirmed = confirm(
+          `⚠️ 题目查重警告：\n\n与题库中已有题目相似度达 ${Math.round(topItem.score * 100)}%\n相似题目：${topItem.text.slice(0, 80)}...\n\n确定仍要保存吗？`
+        )
+        if (!confirmed) return
+      }
+    }
+  } catch (e) {
+    console.warn('题目查重服务暂不可用，跳过查重', e)
+  }
+
   try {
     await saveQuestion({
       courseId: courseId.value,

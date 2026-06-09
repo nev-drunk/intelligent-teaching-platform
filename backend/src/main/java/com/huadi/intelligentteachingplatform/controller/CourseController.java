@@ -3,13 +3,17 @@ package com.huadi.intelligentteachingplatform.controller;
 import com.huadi.intelligentteachingplatform.common.ApiResponse;
 import com.huadi.intelligentteachingplatform.entity.Course;
 import com.huadi.intelligentteachingplatform.entity.CourseResource;
+import com.huadi.intelligentteachingplatform.mapper.CourseResourceMapper;
+import com.huadi.intelligentteachingplatform.service.AiServiceClient;
 import com.huadi.intelligentteachingplatform.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/courses") // 统一使用规范的复数形式 RESTful 路径
@@ -18,6 +22,8 @@ import java.util.List;
 public class CourseController {
 
     private final CourseService courseService;
+    private final CourseResourceMapper courseResourceMapper;
+    private final AiServiceClient aiServiceClient;
 
     // ==================== 1. 课程管理接口 (RESTful 风格) ====================
 
@@ -124,5 +130,61 @@ public class CourseController {
             return ApiResponse.ok("资源删除成功", null);
         }
         return ApiResponse.fail(500, "资源删除失败");
+    }
+
+    /**
+     * 课件图片版面检测 — 调用 AI /layout/detect（旧版，需要上传图片）
+     */
+    @PostMapping("/resources/{id}/analyze-layout")
+    public ApiResponse<CourseResource> analyzeLayout(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ApiResponse.fail(400, "文件不能为空");
+        }
+        try {
+            CourseResource resource = courseService.analyzeLayout(id, file);
+            return ApiResponse.ok("版面检测完成", resource);
+        } catch (Exception e) {
+            return ApiResponse.fail(500, "版面检测失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 课件内容 AI 分析 — 根据已存 file_url 调用 /courseware/detect
+     */
+    @PostMapping("/resources/{id}/analyze")
+    public ApiResponse<CourseResource> analyzeResource(@PathVariable Long id) {
+        try {
+            CourseResource resource = courseService.analyzeResource(id);
+            return ApiResponse.ok("课件分析完成", resource);
+        } catch (Exception e) {
+            return ApiResponse.fail(500, "课件分析失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 试卷版面分析代理 — 调用 Flask /layout/analyze-and-ocr
+     */
+    @PostMapping("/resources/{id}/paper-analyze")
+    public ApiResponse<Map<String, Object>> paperAnalyze(@PathVariable Long id) {
+        try {
+            // 直接查资源表
+            var resource = courseResourceMapper.selectById(id);
+            if (resource == null) return ApiResponse.fail(404, "资源不存在");
+
+            // 通过 AiServiceClient 调用 Flask
+            com.huadi.intelligentteachingplatform.dto.ai.LayoutOcrResult result =
+                    aiServiceClient.analyzeAndOcrByUrl(resource.getFileUrl());
+            Map<String, Object> data = new HashMap<>();
+            data.put("layout_boxes", result.getLayoutBoxes());
+            data.put("ocr_regions", result.getOcrRegions());
+            data.put("combined_text", result.getCombinedText());
+            data.put("anomaly_score", result.getAnomalyScore());
+            data.put("image_size", result.getImageSize());
+            return ApiResponse.ok(data);
+        } catch (Exception e) {
+            return ApiResponse.fail(500, "试卷分析失败: " + e.getMessage());
+        }
     }
 }

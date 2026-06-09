@@ -40,4 +40,11 @@ public interface SubmissionMapper extends BaseMapper<Submission> {
      * 统计提交数量
      */
     long countSubmissions(@Param("taskId") Long taskId);
+
+    /** 根据任务ID查询所有提交 */
+    @Select("SELECT id, task_id, student_id, student_name, submit_text, file_url, " +
+            "ocr_raw_text, ai_score, ai_comment, plagiarism_rate, is_cheated, " +
+            "ai_review_voice_url, teacher_score, teacher_comment, status, submit_time " +
+            "FROM tb_submission WHERE task_id = #{taskId}")
+    List<Submission> selectByTaskId(@Param("taskId") Long taskId);
 }

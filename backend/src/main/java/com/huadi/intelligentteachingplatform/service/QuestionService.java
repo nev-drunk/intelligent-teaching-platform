@@ -4,6 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.huadi.intelligentteachingplatform.dto.ai.SimilarCandidate;
+import com.huadi.intelligentteachingplatform.dto.ai.SimilarItem;
 import com.huadi.intelligentteachingplatform.dto.question.AiGenerateRequest;
 import com.huadi.intelligentteachingplatform.entity.Question;
 import com.huadi.intelligentteachingplatform.mapper.QuestionMapper;
@@ -22,6 +24,7 @@ public class QuestionService {
 
     private final DeepSeekService deepSeekService;
     private final QuestionMapper questionMapper;
+    private final AiServiceClient aiServiceClient;
 
     public List<Question> getAllQuestions() {
         return questionMapper.selectList(
@@ -53,6 +56,30 @@ public class QuestionService {
 
     public void deleteQuestion(Long id) {
         questionMapper.deleteById(id);
+    }
+
+    /**
+     * 题目查重 — 教师新建题目时调用 /similarity/top3 与题库比对
+     *
+     * @param content  新题目内容
+     * @param courseId 课程ID（限定在该课程题库内比对）
+     * @return Top3 相似题目提示（含题目ID和相似度）
+     */
+    public List<SimilarItem> checkDuplicate(String content, Long courseId) {
+        // 获取同课程下所有已有题目的题干作为候选
+        List<Question> existingQuestions = getQuestionsByCourseId(courseId);
+        List<SimilarCandidate> candidates = new ArrayList<>();
+        for (Question q : existingQuestions) {
+            if (q.getContent() != null && !q.getContent().isBlank()) {
+                candidates.add(new SimilarCandidate(q.getId(), q.getContent()));
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+
+        return aiServiceClient.getTop3SimilarWithId(content, candidates);
     }
 
     @Transactional(rollbackFor = Exception.class)

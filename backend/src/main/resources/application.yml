@@ -8,7 +8,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/smart_study_teacher?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&connectionCollation=utf8mb4_unicode_ci&characterSetResults=UTF-8
     username: root
-    password: 123456zcl
+    password: ${DB_PASSWORD:your_db_password}
 
   sql:
     init:
@@ -46,17 +46,21 @@ file:
     path: uploads/
 
 deepseek:
-  api-key: sk-d2a2dad54ddb4d5f9d91c83d87b91ff1
+  api-key: ${DEEPSEEK_API_KEY:your_deepseek_api_key}
   api-url: https://api.deepseek.com/chat/completions
 
 baidu:
   ocr:
-    app-id: "7796798"
-    api-key: "uQ763DvEsSwTWOhS6QWvuHcS"
-    secret-key: "tz9hG4nc5ViCoj93JFz0xUKXsLKLVfR7"
+    app-id: ${BAIDU_OCR_APP_ID:your_baidu_app_id}
+    api-key: ${BAIDU_OCR_API_KEY:your_baidu_api_key}
+    secret-key: ${BAIDU_OCR_SECRET_KEY:your_baidu_secret_key}
     connection-timeout: 5000
     read-timeout: 10000
 
+ai:
+  service:
+    url: ${AI_SERVICE_URL:http://localhost:5000}
+
 jwt:
-  secret: IntelligentTeachingPlatform2024SecretKeyForJwtToken
+  secret: ${JWT_SECRET:your_jwt_secret}
   expire-hours: 24

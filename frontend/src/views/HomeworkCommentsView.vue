@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { fetchSubmissions, updateComment } from '@/api/submission'
+import { fetchSubmissionList, teacherGradeSubmission } from '@/api/submission'
 
 const auth = useAuthStore()
 const submissions = ref([])
@@ -22,9 +22,8 @@ async function loadSubmissions() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const teacherId = Number(auth.teacherId) || 1
-    const res = await fetchSubmissions(teacherId)
-    submissions.value = res.data || []
+    const res = await fetchSubmissionList({ page: 1, size: 100 })
+    submissions.value = res.data?.records || []
   } catch (e) {
     errorMessage.value = e.message || '加载失败'
   } finally {
@@ -33,22 +32,15 @@ async function loadSubmissions() {
 }
 
 function getScoreClass(score) {
-  if (!score) return 'score--pending'
-  if (score >= 90) return 'score--excellent'
-  if (score >= 80) return 'score--good'
-  if (score >= 60) return 'score--pass'
-  return 'score--fail'
+  if (!score) return ''
+  if (score >= 90) return 'score-excellent'
+  if (score >= 70) return 'score-good'
+  if (score >= 60) return 'score-pass'
+  return 'score-fail'
 }
 
 function openCommentModal(submission) {
-  editingComment.value = {
-    id: submission.id,
-    comment: submission.teacherComment || '',
-    score: submission.teacherScore || null,
-    studentName: submission.studentName,
-    taskTitle: submission.taskTitle,
-    courseName: submission.courseName
-  }
+  editingComment.value = { id: submission.id, comment: submission.teacherComment || '', score: submission.teacherScore || 0 }
   showModal.value = true
 }
 
@@ -59,11 +51,11 @@ async function saveComment() {
   }
   errorMessage.value = ''
   try {
-    await updateComment(
-      editingComment.value.id,
-      editingComment.value.comment,
-      editingComment.value.score
-    )
+    await teacherGradeSubmission({
+      submissionId: editingComment.value.id,
+      teacherComment: editingComment.value.comment,
+      teacherScore: editingComment.value.score
+    })
     showModal.value = false
     editingComment.value = null
     await loadSubmissions()
@@ -73,94 +65,44 @@ async function saveComment() {
 }
 
 function speakSubmission(submission) {
-  if (isSpeaking.value && selectedSubmission.value === submission.id) {
-    window.speechSynthesis.cancel()
-    isSpeaking.value = false
-    selectedSubmission.value = null
-    return
+  if (submission.aiReviewVoiceUrl) {
+    playReviewVoice(submission)
   }
-  if (isSpeaking.value) {
-    window.speechSynthesis.cancel()
-  }
-  selectedSubmission.value = submission.id
-  const text = `学生姓名：${submission.studentName}。课程：${
-    submission.courseName || '未知课程'
-  }。作业标题：${submission.taskTitle || '未知作业'}。提交内容：${
-    submission.submitText || '无'
-  }。教师评语：${submission.teacherComment || '暂无评语'}。得分：${
-    submission.teacherScore || '未评分'
-  }分。`
-  isSpeaking.value = true
-  const utterance = new SpeechSynthesisUtterance(text)
-  const voices = window.speechSynthesis.getVoices()
-  if (voices.length > 0) {
-    utterance.voice = voices.find((v) => v.lang.includes('zh')) || voices[0]
-  }
-  utterance.onend = () => {
-    isSpeaking.value = false
-    selectedSubmission.value = null
-  }
-  utterance.onerror = () => {
-    isSpeaking.value = false
-    selectedSubmission.value = null
-  }
-  window.speechSynthesis.speak(utterance)
 }
 
-function speakAllSubmissions() {
-  if (isSpeaking.value) {
-    window.speechSynthesis.cancel()
-    isSpeaking.value = false
-    selectedSubmission.value = null
-    return
-  }
+async function speakAllSubmissions() {
+  if (isSpeaking.value) { isSpeaking.value = false; return }
   isSpeaking.value = true
-  let index = 0
-  const voices = window.speechSynthesis.getVoices()
-
-  function speakNext() {
-    if (index >= submissions.value.length || !isSpeaking.value) {
-      isSpeaking.value = false
-      selectedSubmission.value = null
-      return
+  for (const sub of submissions.value) {
+    if (!isSpeaking.value) break
+    if (sub.aiReviewVoiceUrl) {
+      selectedSubmission.value = sub.id
+      await new Promise(r => {
+        const a = new Audio('http://localhost:8081/' + sub.aiReviewVoiceUrl)
+        a.onended = r; a.onerror = r; a.play().catch(r); setTimeout(r, 15000)
+      })
     }
-    const submission = submissions.value[index]
-    selectedSubmission.value = submission.id
-    const text = `学生姓名：${submission.studentName}。课程：${
-      submission.courseName || '未知课程'
-    }。作业标题：${submission.taskTitle || '未知作业'}。提交内容：${
-      submission.submitText || '无'
-    }。教师评语：${submission.teacherComment || '暂无评语'}。得分：${
-      submission.teacherScore || '未评分'
-    }分。`
-    const utterance = new SpeechSynthesisUtterance(text)
-    if (voices.length > 0) {
-      utterance.voice = voices.find((v) => v.lang.includes('zh')) || voices[0]
-    }
-    utterance.onend = () => {
-      if (isSpeaking.value) {
-        index++
-        speakNext()
-      }
-    }
-    utterance.onerror = () => {
-      isSpeaking.value = false
-      selectedSubmission.value = null
-    }
-    window.speechSynthesis.speak(utterance)
   }
-  speakNext()
+  isSpeaking.value = false
+  selectedSubmission.value = null
 }
 
 function formatTime(time) {
   if (!time) return '未知时间'
-  return new Date(time).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  if (Array.isArray(time)) {
+    const [y, m, d, hh, mm] = time
+    return y + '/' + String(m).padStart(2,'0') + '/' + String(d).padStart(2,'0') + ' ' + String(hh||0).padStart(2,'0') + ':' + String(mm||0).padStart(2,'0')
+  }
+  const d = new Date(time)
+  if (isNaN(d.getTime())) return String(time)
+  return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function playReviewVoice(submission) {
+  const url = submission.aiReviewVoiceUrl
+  if (!url) return
+  const audio = new Audio('http://localhost:8081/' + url)
+  audio.play().catch(() => {})
 }
 </script>
 
@@ -250,32 +192,17 @@ function formatTime(time) {
           <span class="time">{{ formatTime(submission.submitTime) }}</span>
           <div class="actions">
             <button
+              v-if="submission.aiReviewVoiceUrl"
               class="btn btn--ghost"
-              :class="{ 'btn--primary': selectedSubmission === submission.id && isSpeaking }"
-              @click="speakSubmission(submission)"
+              @click="playReviewVoice(submission)"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M11 5L6 9H2v6h4l5 4V5z"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M15.54 8.46a5 5 0 0 1 0 7.07"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-                <path
-                  d="M19.07 4.93a10 10 0 0 1 0 14.14"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-              {{ selectedSubmission === submission.id && isSpeaking ? '停止' : '语音播报' }}
+              🔊 播放评语
+            </button>
+            <button
+              class="btn btn--ghost"
+              @click="editComment(submission)"
+            >
+              ✏️ 编辑
             </button>
             <button class="btn btn--ghost btn--primary" @click="openCommentModal(submission)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">

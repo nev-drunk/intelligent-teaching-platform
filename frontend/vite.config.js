@@ -15,6 +15,11 @@ export default defineConfig({
     }
   },
 
+  // echarts预构建 — 修复504
+  optimizeDeps: {
+    include: ['echarts']
+  },
+
   // 开发服务器
   server: {
     // 前端端口

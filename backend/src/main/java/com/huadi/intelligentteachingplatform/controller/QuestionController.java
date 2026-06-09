@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -68,6 +69,32 @@ public class QuestionController {
             return ApiResponse.fail(400, e.getMessage());
         } catch (Exception e) {
             return ApiResponse.fail(500, "大模型生成异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 题目查重 — 教师新建题目时调用 /similarity/top3 与题库比对
+     *
+     * POST /api/questions/check-duplicate
+     * Body: {"content": "题目内容", "courseId": 1}
+     */
+    @PostMapping("/check-duplicate")
+    public ApiResponse<List<com.huadi.intelligentteachingplatform.dto.ai.SimilarItem>> checkDuplicate(
+            @RequestBody Map<String, Object> body) {
+        try {
+            String content = (String) body.get("content");
+            Long courseId = body.get("courseId") != null
+                    ? Long.valueOf(body.get("courseId").toString()) : 1L;
+
+            if (content == null || content.isBlank()) {
+                return ApiResponse.fail(400, "题目内容不能为空");
+            }
+
+            List<com.huadi.intelligentteachingplatform.dto.ai.SimilarItem> results =
+                    questionService.checkDuplicate(content, courseId);
+            return ApiResponse.ok(results);
+        } catch (Exception e) {
+            return ApiResponse.fail(500, "查重异常: " + e.getMessage());
         }
     }
 }

@@ -1,0 +1,88 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "type": "SINGLE",
+      "content": "What is 1+1?",
+      "answer": "B",
+      "score": 5
+    },
+    {
+      "id": 2,
+      "type": "SINGLE",
+      "content": "Python keyword for function?",
+      "answer": "D",
+      "score": 5
+    },
+    {
+      "id": 3,
+      "type": "SINGLE",
+      "content": "What does CPU stand for?",
+      "answer": "A",
+      "score": 5
+    },
+    {
+      "id": 4,
+      "type": "SINGLE",
+      "content": "FIFO data structure?",
+      "answer": "C",
+      "score": 5
+    },
+    {
+      "id": 5,
+      "type": "SINGLE",
+      "content": "Binary of 5?",
+      "answer": "B",
+      "score": 5
+    },
+    {
+      "id": 6,
+      "type": "SINGLE",
+      "content": "Web protocol?",
+      "answer": "A",
+      "score": 5
+    },
+    {
+      "id": 7,
+      "type": "SINGLE",
+      "content": "RAM stands for?",
+      "answer": "D",
+      "score": 5
+    },
+    {
+      "id": 8,
+      "type": "SINGLE",
+      "content": "Browser language?",
+      "answer": "C",
+      "score": 5
+    },
+    {
+      "id": 9,
+      "type": "SINGLE",
+      "content": "Python file extension?",
+      "answer": "B",
+      "score": 5
+    },
+    {
+      "id": 10,
+      "type": "SINGLE",
+      "content": "O(n log n) sort?",
+      "answer": "D",
+      "score": 5
+    },
+    {
+      "id": 11,
+      "type": "SINGLE",
+      "content": "Capital of France?",
+      "answer": "A",
+      "score": 5
+    },
+    {
+      "id": 12,
+      "type": "SINGLE",
+      "content": "2+2*3=?",
+      "answer": "C",
+      "score": 5
+    }
+  ]
+}

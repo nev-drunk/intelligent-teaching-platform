@@ -124,8 +124,46 @@
             type="textarea"
             :rows="4"
             placeholder="请详细描述学生提出的技术问题..."
+            @input="onQuestionInput"
           />
         </el-form-item>
+
+        <!-- AI 相似问题推荐 -->
+        <div v-if="similarQuestions.length > 0" class="similar-questions-panel">
+          <div class="similar-header">
+            <span class="similar-badge">🤖 AI 相似问题推荐</span>
+          </div>
+          <!-- 高相似度警告 -->
+          <div v-if="highSimilarityItem" class="high-similarity-warning">
+            <el-icon class="warning-icon"><WarningFilled /></el-icon>
+            <span>已有高度相似问题（{{ Math.round(highSimilarityItem.score * 100) }}%），是否直接查看？</span>
+            <el-button type="warning" size="small" @click="viewExistingIssue(highSimilarityItem)">
+              查看已有问题
+            </el-button>
+          </div>
+          <div
+            v-for="(item, idx) in similarQuestions"
+            :key="idx"
+            class="similar-item"
+          >
+            <div class="similar-item-header">
+              <span class="similar-rank">#{{ idx + 1 }}</span>
+              <el-progress
+                :percentage="Math.round(item.score * 100)"
+                :stroke-width="6"
+                :color="item.score > 0.8 ? '#f56c6c' : item.score > 0.5 ? '#e6a23c' : '#67c23a'"
+                style="flex: 1; margin: 0 10px"
+              />
+              <span class="similar-percent">{{ Math.round(item.score * 100) }}%</span>
+            </div>
+            <p class="similar-text">{{ item.text }}</p>
+            <div v-if="item.id" class="similar-actions">
+              <el-button type="primary" link size="small" @click="viewExistingIssueById(item.id)">
+                查看详情
+              </el-button>
+            </div>
+          </div>
+        </div>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -221,10 +259,12 @@ import {
   Search,
   UserFilled,
   Clock,
-  CircleCheck
+  CircleCheck,
+  WarningFilled
 } from '@element-plus/icons-vue'
 import issueApi from '@/api/issue'
 import courseApi from '@/api/course'
+import request from '@/api/request'
 
 // ========== 核心状态响应式变量 ==========
 const loading = ref(false)
@@ -303,6 +343,70 @@ const publishForm = ref({
 
 const courseOptions = ref([])
 
+// AI 相似问题推荐
+const similarQuestions = ref([])
+let similarityDebounceTimer = null
+
+// 最高相似度项（>0.8时触发警告）
+const highSimilarityItem = computed(() => {
+  if (similarQuestions.value.length > 0 && similarQuestions.value[0].score > 0.8) {
+    return similarQuestions.value[0]
+  }
+  return null
+})
+
+/**
+ * 查看已有问题详情
+ */
+function viewExistingIssue(item) {
+  // 在列表中查找对应的问题
+  const found = issueList.value.find((i) => i.id === item.id)
+  if (found) {
+    openDetailDialog(found)
+  }
+}
+
+function viewExistingIssueById(id) {
+  const found = issueList.value.find((i) => i.id === id)
+  if (found) {
+    openDetailDialog(found)
+  } else {
+    ElMessage.info('该问题可能已被删除')
+  }
+}
+
+/**
+ * 【只读】输入问题内容时实时调用相似度检索接口
+ * 仅查询历史问题库，绝对不保存任何数据
+ */
+function onQuestionInput() {
+  const text = publishForm.value.questionText?.trim()
+  if (!text || text.length < 3) {
+    similarQuestions.value = []
+    return
+  }
+
+  // 防抖 500ms
+  if (similarityDebounceTimer) clearTimeout(similarityDebounceTimer)
+  similarityDebounceTimer = setTimeout(async () => {
+    try {
+      // 调用只读接口 — 仅检索，不保存
+      const res = await request.post('/api/issue/check-similar', {
+        questionText: text,
+        courseId: publishForm.value.courseId || 1
+      })
+      if (res.code === 200) {
+        // 只读接口直接返回数组
+        const results = Array.isArray(res.data) ? res.data : []
+        similarQuestions.value = results.slice(0, 3)
+      }
+    } catch (e) {
+      console.warn('相似度检测暂不可用', e)
+      similarQuestions.value = []
+    }
+  }, 500)
+}
+
 const publishRules = {
   studentName: [{ required: true, message: '请输入学生姓名', trigger: 'blur' }],
   courseId: [{ required: true, message: '请选择课程', trigger: 'change' }],
@@ -311,6 +415,7 @@ const publishRules = {
 
 function openPublishDialog() {
   publishForm.value = { studentName: '', courseId: null, questionText: '' }
+  similarQuestions.value = []
   publishDialogVisible.value = true
 }
 
@@ -320,10 +425,23 @@ async function handlePublish() {
 
   submitting.value = true
   try {
-    await issueApi.create(publishForm.value)
-    ElMessage.success('问题成功发布至业务中心')
-    publishDialogVisible.value = false
-    fetchList() // 实时强刷真实列表
+    // 使用带相似度检测的保存接口（此时才真正保存到数据库）
+    const res = await request.post('/api/issue/create-with-similarity', {
+      studentName: publishForm.value.studentName,
+      courseId: publishForm.value.courseId,
+      questionText: publishForm.value.questionText
+    })
+    if (res.code === 200) {
+      // 如果有相似问题结果，一并展示
+      if (res.data?.similarQuestions) {
+        similarQuestions.value = res.data.similarQuestions.slice(0, 3)
+      }
+      ElMessage.success('问题成功发布至业务中心')
+      publishDialogVisible.value = false
+      fetchList()
+    } else {
+      ElMessage.error(res.msg || '问题发布失败')
+    }
   } catch (e) {
     console.error('发布失败:', e)
     ElMessage.error('问题发布失败，请检查网络')
@@ -688,5 +806,80 @@ async function handleDelete(row) {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* ── AI 相似问题推荐面板 ── */
+.similar-questions-panel {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border: 1px solid #d8b4fe;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 16px;
+}
+.similar-header {
+  margin-bottom: 12px;
+}
+.similar-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b21a8;
+}
+.similar-item {
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #e9d5ff;
+}
+.similar-item:last-child {
+  margin-bottom: 0;
+}
+.similar-item-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.similar-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7c3aed;
+  width: 24px;
+}
+.similar-percent {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  width: 42px;
+  text-align: right;
+}
+.similar-text {
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 28px;
+}
+.similar-actions {
+  text-align: right;
+  padding-top: 6px;
+  padding-left: 28px;
+}
+
+/* 高相似度警告 */
+.high-similarity-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #dc2626;
+}
+.high-similarity-warning .warning-icon {
+  font-size: 18px;
+  flex-shrink: 0;
 }
 </style>

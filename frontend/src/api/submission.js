@@ -19,21 +19,19 @@ export function fetchSubmissionById(id) {
  */
 export function uploadSubmission(formData) {
   return request.post('/api/submission/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
+    headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
 
 /**
- * AI批改
+ * AI批改 — OCR + 评分 + DeepSeek评语 + 抄袭检测
  */
-export function aiGradeSubmission(id) {
-  return request.post(`/api/submission/ai-grade/${id}`)
+export function autoGradeSubmission(id) {
+  return request.post(`/api/submission/auto-grade/${id}`)
 }
 
 /**
- * 教师批改
+ * 教师批改（含TTS语音评语）
  */
 export function teacherGradeSubmission(data) {
   return request.put('/api/submission/teacher-grade', data)
@@ -53,16 +51,12 @@ export function fetchSubmissionsByTeacherId(teacherId) {
   return request.get(`/api/submission/teacher/${teacherId}`)
 }
 
-/**
- * 更新评语（兼容旧版API）
- */
+/** @deprecated 兼容 HomeworkCommentsView */
 export function fetchSubmissions(teacherId) {
   return request.get(`/api/submission/teacher/${teacherId}`)
 }
 
-/**
- * 更新评语和分数（兼容旧版API）
- */
+/** @deprecated 兼容 HomeworkCommentsView */
 export function updateComment(id, comment, score) {
   return request.put('/api/submission/teacher-grade', {
     submissionId: id,
