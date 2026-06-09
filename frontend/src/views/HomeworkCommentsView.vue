@@ -78,7 +78,7 @@ async function speakAllSubmissions() {
     if (sub.aiReviewVoiceUrl) {
       selectedSubmission.value = sub.id
       await new Promise(r => {
-        const a = new Audio('http://localhost:8081/' + sub.aiReviewVoiceUrl)
+        const a = new Audio(import.meta.env.VITE_API_BASE_URL + '/' + sub.aiReviewVoiceUrl)
         a.onended = r; a.onerror = r; a.play().catch(r); setTimeout(r, 15000)
       })
     }
@@ -101,7 +101,7 @@ function formatTime(time) {
 function playReviewVoice(submission) {
   const url = submission.aiReviewVoiceUrl
   if (!url) return
-  const audio = new Audio('http://localhost:8081/' + url)
+  const audio = new Audio(import.meta.env.VITE_API_BASE_URL + '/' + url)
   audio.play().catch(() => {})
 }
 </script>

@@ -377,7 +377,7 @@
           </div>
           <div class="detail-image-wrapper">
             <img
-              :src="'http://localhost:8081/' + detailData.fileUrl.replace(/\\/g, '/')"
+              :src="import.meta.env.VITE_API_BASE_URL + '/' + detailData.fileUrl.replace(/\\/g, '/')"
               class="detail-preview-image"
               ref="detailImgRef"
               @load="onDetailImgLoad"

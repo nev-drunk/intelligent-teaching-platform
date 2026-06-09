@@ -39,7 +39,7 @@ async function handlePublish() {
     // 播放服务器生成的 TTS 音频
     const ttsUrl = res?.ttsAudioUrl
     if (ttsUrl && !ttsUrl.startsWith('client://')) {
-      const audio = new Audio('http://localhost:8081/' + ttsUrl)
+      const audio = new Audio(import.meta.env.VITE_API_BASE_URL + '/' + ttsUrl)
       audio.play().catch(() => {})
     }
     form.value = { title: '', content: '' }
@@ -76,7 +76,7 @@ function replay(notice) {
   // 优先使用服务器生成的 TTS 音频文件
   const ttsUrl = notice.ttsAudioUrl
   if (ttsUrl && ttsUrl !== 'client://speechSynthesis' && !ttsUrl.startsWith('client://')) {
-    const audio = new Audio('http://localhost:8081/' + ttsUrl)
+    const audio = new Audio(import.meta.env.VITE_API_BASE_URL + '/' + ttsUrl)
     speakingId.value = notice.id
     audio.onended = () => {
       speakingId.value = null

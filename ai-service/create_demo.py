@@ -3,7 +3,7 @@ import urllib.request
 import json
 import os
 
-base = 'http://localhost:8081'
+base = os.environ.get('API_BASE_URL', 'http://localhost:8081')
 test_dir = os.path.join(os.path.dirname(__file__), 'test')
 
 def upload(task_id, sid, name, filepath, text=None):
@@ -68,4 +68,4 @@ for sid, name, img in [(1, '李明', '11_clean_answer_sheet.png'), (2, '王小�
     sid = upload(14, sid, name, os.path.join(test_dir, img))
     print(f'  {name}: SID={sid}')
 
-print('\nDone! Check http://localhost:5173')
+print(f'\nDone! Check {os.environ.get("FRONTEND_URL", "http://localhost:5173")}')

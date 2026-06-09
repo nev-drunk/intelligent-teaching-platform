@@ -24,7 +24,7 @@ export async function synthesizeServerSpeech(text) {
  */
 export function playAudioUrl(audioUrl) {
   if (!audioUrl) return
-  const url = audioUrl.startsWith('http') ? audioUrl : 'http://localhost:8081/' + audioUrl
+  const url = audioUrl.startsWith('http') ? audioUrl : import.meta.env.VITE_API_BASE_URL + '/' + audioUrl
   const audio = new Audio(url)
   audio.play().catch(() => {})
   return audio

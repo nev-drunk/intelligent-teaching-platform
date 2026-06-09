@@ -348,8 +348,8 @@ function getLayoutColor(label) {
 async function handlePaperAnalyze(resource) {
   paperAnalyzing.value = resource.id
   try {
-    const imageUrl = 'http://localhost:8081' + resource.fileUrl
-    const res = await fetch(`http://localhost:8081/api/courses/resources/${resource.id}/paper-analyze`, {
+    const imageUrl = import.meta.env.VITE_API_BASE_URL + resource.fileUrl
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/courses/resources/${resource.id}/paper-analyze`, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
     })
@@ -574,11 +574,11 @@ async function handleLayoutDetect(resource) {
   selectedBoxIndices.value = new Set()
   try {
     // 构建文件 URL（用于 Canvas 渲染）
-    const imageUrl = 'http://localhost:8081' + resource.fileUrl
+    const imageUrl = import.meta.env.VITE_API_BASE_URL + resource.fileUrl
 
     // 调用后端课件分析接口（无需上传文件，直接根据已存储的 file_url 分析）
     const res = await fetch(
-      `http://localhost:8081/api/courses/resources/${resource.id}/analyze`,
+      `${import.meta.env.VITE_API_BASE_URL}/api/courses/resources/${resource.id}/analyze`,
       {
         method: 'POST',
         headers: {
@@ -781,14 +781,14 @@ const handleDelete = async (id) => {
 
 const handleCrop = (res) => {
   currentResource.value = res
-  cropImageUrl.value = 'http://localhost:8081' + res.fileUrl
+  cropImageUrl.value = import.meta.env.VITE_API_BASE_URL + res.fileUrl
   cropperKey.value++
   showCropModal.value = true
   previewUrl.value = ''
 }
 
 const previewFile = (res) => {
-  window.open('http://localhost:8081' + res.fileUrl, '_blank')
+  window.open(import.meta.env.VITE_API_BASE_URL + res.fileUrl, '_blank')
 }
 
 const getCropData = () => {
