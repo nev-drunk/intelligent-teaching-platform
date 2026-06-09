@@ -44,6 +44,8 @@ intelligent-teaching-platform
 - 阿里云 DashScope（TTS 语音合成 / 大模型对话）
 - DeepSeek API（AI 批改评语）
 
+- 这里为了交作业ai服务冗余，可以视情况调整
+
 ---
 
 ## 功能模块
