@@ -262,10 +262,24 @@
               </el-table-column>
               <el-table-column label="查重" width="100" align="center">
                 <template #default="{ row }">
-                  <span v-if="row.plagiarismRate === null || row.plagiarismRate === undefined || row.plagiarismRate === 0" class="text-muted">-</span>
-                  <span v-else-if="row.plagiarismRate > 80" style="color:#ef4444;font-weight:700">{{ row.plagiarismRate }}%</span>
-                  <span v-else-if="row.plagiarismRate > 50" style="color:#e6a23c;font-weight:600">{{ row.plagiarismRate }}%</span>
-                  <span v-else style="color:#67c23a;font-weight:600">{{ row.plagiarismRate }}%</span>
+                  <span
+                    v-if="
+                      row.plagiarismRate === null ||
+                      row.plagiarismRate === undefined ||
+                      row.plagiarismRate === 0
+                    "
+                    class="text-muted"
+                    >-</span
+                  >
+                  <span v-else-if="row.plagiarismRate > 80" style="color: #ef4444; font-weight: 700"
+                    >{{ row.plagiarismRate }}%</span
+                  >
+                  <span v-else-if="row.plagiarismRate > 50" style="color: #e6a23c; font-weight: 600"
+                    >{{ row.plagiarismRate }}%</span
+                  >
+                  <span v-else style="color: #67c23a; font-weight: 600"
+                    >{{ row.plagiarismRate }}%</span
+                  >
                 </template>
               </el-table-column>
               <el-table-column prop="aiScore" label="AI得分" width="100" align="center">
@@ -377,7 +391,7 @@
           </div>
           <div class="detail-image-wrapper">
             <img
-              :src="import.meta.env.VITE_API_BASE_URL + '/' + detailData.fileUrl.replace(/\\/g, '/')"
+              :src="baseUrl + '/' + detailData.fileUrl.replace(/\\/g, '/')"
               class="detail-preview-image"
               ref="detailImgRef"
               @load="onDetailImgLoad"
@@ -644,37 +658,77 @@
   </div>
 
   <!-- 查重结果弹窗 -->
-  <el-dialog v-model="plagiarismVisible" :title="'查重结果：' + plagiarismStudentName" width="720px" destroy-on-close>
+  <el-dialog
+    v-model="plagiarismVisible"
+    :title="'查重结果：' + plagiarismStudentName"
+    width="720px"
+    destroy-on-close
+  >
     <!-- 提示 -->
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:12px;padding:6px 10px;background:#f8fafc;border-radius:6px">
+    <div
+      style="
+        font-size: 12px;
+        color: #94a3b8;
+        margin-bottom: 12px;
+        padding: 6px 10px;
+        background: #f8fafc;
+        border-radius: 6px;
+      "
+    >
       基于 版面检测 + 手写识别 → Jaccard Bigram 文本相似度比对
     </div>
     <!-- Loading -->
-    <div v-if="plagiarismLoading" style="text-align:center;padding:40px">
-      <el-icon class="is-loading" style="font-size:28px;color:#3b82f6"><Loading /></el-icon>
-      <p style="color:#94a3b8;margin-top:12px">正在识别并比对...</p>
+    <div v-if="plagiarismLoading" style="text-align: center; padding: 40px">
+      <el-icon class="is-loading" style="font-size: 28px; color: #3b82f6"><Loading /></el-icon>
+      <p style="color: #94a3b8; margin-top: 12px">正在识别并比对...</p>
     </div>
     <!-- 空 -->
-    <div v-else-if="!plagiarismResult || (!plagiarismResult.results || plagiarismResult.results.length === 0)" style="text-align:center;padding:30px;color:#94a3b8">
+    <div
+      v-else-if="
+        !plagiarismResult || !plagiarismResult.results || plagiarismResult.results.length === 0
+      "
+      style="text-align: center; padding: 30px; color: #94a3b8"
+    >
       ✅ 未发现相似提交
     </div>
     <!-- 结果 -->
     <div v-else>
-      <div style="display:flex;gap:20px;margin-bottom:10px;font-size:13px;color:#475569">
-        <span>已检测 <strong>{{ plagiarismResult.checkedCount }}</strong> 份提交</span>
-        <span>最高相似度 <strong :style="{color: plagiarismResult.maxSimilarity > 80 ? '#ef4444' : '#10b981'}">{{ plagiarismResult.maxSimilarity }}%</strong></span>
-        <el-tag v-if="plagiarismResult.currentCheated" type="danger" size="small">⚠ 疑似抄袭</el-tag>
+      <div style="display: flex; gap: 20px; margin-bottom: 10px; font-size: 13px; color: #475569">
+        <span
+          >已检测 <strong>{{ plagiarismResult.checkedCount }}</strong> 份提交</span
+        >
+        <span
+          >最高相似度
+          <strong :style="{ color: plagiarismResult.maxSimilarity > 80 ? '#ef4444' : '#10b981' }"
+            >{{ plagiarismResult.maxSimilarity }}%</strong
+          ></span
+        >
+        <el-tag v-if="plagiarismResult.currentCheated" type="danger" size="small"
+          >⚠ 疑似抄袭</el-tag
+        >
       </div>
-      <div v-for="(p, i) in plagiarismResult.results" :key="i" class="plagiarism-match" style="padding:10px;margin-bottom:8px;background:#f8fafc;border-radius:8px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-weight:600;color:#334155;min-width:100px">{{ p.studentName }}</span>
-          <el-progress :percentage="p.similarity" :stroke-width="8"
+      <div
+        v-for="(p, i) in plagiarismResult.results"
+        :key="i"
+        class="plagiarism-match"
+        style="padding: 10px; margin-bottom: 8px; background: #f8fafc; border-radius: 8px"
+      >
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="font-weight: 600; color: #334155; min-width: 100px">{{
+            p.studentName
+          }}</span>
+          <el-progress
+            :percentage="p.similarity"
+            :stroke-width="8"
             :color="p.similarity > 80 ? '#ef4444' : p.similarity > 50 ? '#e6a23c' : '#67c23a'"
-            style="flex:1" />
-          <span style="font-weight:700;font-size:13px">{{ p.similarity }}%</span>
+            style="flex: 1"
+          />
+          <span style="font-weight: 700; font-size: 13px">{{ p.similarity }}%</span>
           <el-tag v-if="p.similarity > 80" type="danger" size="small">疑似抄袭</el-tag>
           <el-tag v-else-if="p.similarity > 50" type="warning" size="small">可疑</el-tag>
-          <el-button size="small" text type="primary" @click="showPlagiarismCompare(p)">对比</el-button>
+          <el-button size="small" text type="primary" @click="showPlagiarismCompare(p)"
+            >对比</el-button
+          >
         </div>
       </div>
     </div>
@@ -682,15 +736,45 @@
 
   <!-- 文本对比弹窗 -->
   <el-dialog v-model="plagiarismCompareVisible" title="文本对比" width="800px" destroy-on-close>
-    <div v-if="plagiarismCompareData" style="display:flex;gap:16px">
-      <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px">
-        <div style="font-weight:600;color:#2563eb;margin-bottom:8px">{{ plagiarismStudentName }}（当前）</div>
-        <div style="font-size:13px;color:#334155;white-space:pre-wrap;max-height:400px;overflow-y:auto;line-height:1.6">{{ plagiarismCompareData.sourceText }}</div>
+    <div v-if="plagiarismCompareData" style="display: flex; gap: 16px">
+      <div style="flex: 1; background: #f8fafc; border-radius: 8px; padding: 12px">
+        <div style="font-weight: 600; color: #2563eb; margin-bottom: 8px">
+          {{ plagiarismStudentName }}（当前）
+        </div>
+        <div
+          style="
+            font-size: 13px;
+            color: #334155;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.6;
+          "
+        >
+          {{ plagiarismCompareData.sourceText }}
+        </div>
       </div>
-      <div style="display:flex;align-items:center;font-weight:700;color:#94a3b8;flex-shrink:0">VS</div>
-      <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px">
-        <div style="font-weight:600;color:#dc2626;margin-bottom:8px">{{ plagiarismCompareData.studentName }}</div>
-        <div style="font-size:13px;color:#334155;white-space:pre-wrap;max-height:400px;overflow-y:auto;line-height:1.6">{{ plagiarismCompareData.compareText }}</div>
+      <div
+        style="display: flex; align-items: center; font-weight: 700; color: #94a3b8; flex-shrink: 0"
+      >
+        VS
+      </div>
+      <div style="flex: 1; background: #f8fafc; border-radius: 8px; padding: 12px">
+        <div style="font-weight: 600; color: #dc2626; margin-bottom: 8px">
+          {{ plagiarismCompareData.studentName }}
+        </div>
+        <div
+          style="
+            font-size: 13px;
+            color: #334155;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.6;
+          "
+        >
+          {{ plagiarismCompareData.compareText }}
+        </div>
       </div>
     </div>
   </el-dialog>
@@ -717,6 +801,8 @@ import request from '@/api/request'
 import { fetchSubmissionList, deleteSubmission } from '@/api/submission'
 import { getTasksByTeacher, createTask, deleteTask as removeTask } from '@/api/task'
 import { fetchTasks } from '@/api/task'
+
+const baseUrl = import.meta.env.VITE_API_BASE_URL
 
 const SUBMITTED = 'SUBMITTED'
 const AI_PROCESSED = 'AI_PROCESSED'
@@ -1450,7 +1536,10 @@ function showPlagiarismCompare(pair) {
 function cleanOcrText(raw) {
   if (!raw) return '(无内容)'
   if (raw.startsWith('{')) {
-    try { const j = JSON.parse(raw); return j.combined_text || j.note || raw } catch {}
+    try {
+      const j = JSON.parse(raw)
+      return j.combined_text || j.note || raw
+    } catch {}
   }
   return raw
 }

@@ -43,132 +43,181 @@ const aiDiagnosedCount = computed(() => reportList.value.filter((r) => r.llmAnal
 const latestDiagnosed = computed(() => reportList.value.find((r) => r.llmAnalysisReport) || null)
 
 // ========== 图表 ==========
-const lineChartRef = ref(null)
-const areaChartRef = ref(null)
-let lineChart = null
-let areaChartInstance = null
+const pieChartRef = ref(null)
+let pieChart = null
+
+// 满意度分布档位（柔和色系，与右侧 UI 统一）
+const SATISFACTION_TIERS = [
+  { key: 'excellent', label: '优秀', range: [90, 101], color: '#8b5cf6' },  // 紫色
+  { key: 'good',     label: '良好', range: [80, 90],  color: '#10b981' },  // 青绿
+  { key: 'medium',   label: '中等', range: [70, 80],  color: '#3b82f6' },  // 蓝色
+  { key: 'pass',     label: '及格', range: [60, 70],  color: '#f59e0b' },  // 浅橙
+  { key: 'fail',     label: '不及格', range: [0, 60], color: '#ef4444' }   // 红色
+]
+
+const satisfactionDistribution = computed(() => {
+  const counts = { excellent: 0, good: 0, medium: 0, pass: 0, fail: 0 }
+  reportList.value.forEach((r) => {
+    const s = Number(r.avgSatisfaction) || 0
+    for (const tier of SATISFACTION_TIERS) {
+      if (s >= tier.range[0] && s < tier.range[1]) {
+        counts[tier.key]++
+        break
+      }
+    }
+  })
+  return SATISFACTION_TIERS.map((t) => ({
+    ...t,
+    value: counts[t.key]
+  })).filter((t) => t.value > 0)
+})
 
 function initCharts() {
-  if (lineChartRef.value && !lineChart) {
-    lineChart = echarts.init(lineChartRef.value, null, { renderer: 'canvas' })
+  if (pieChartRef.value && !pieChart) {
+    pieChart = echarts.init(pieChartRef.value, null, { renderer: 'canvas' })
   }
-  if (areaChartRef.value && !areaChartInstance) {
-    areaChartInstance = echarts.init(areaChartRef.value, null, { renderer: 'canvas' })
-  }
+}
+
+// ========== 科目评分排行（降序） ==========
+const sortedSubjectData = computed(() => {
+  return [...reportList.value].sort((a, b) => (Number(b.avgSatisfaction) || 0) - (Number(a.avgSatisfaction) || 0))
+})
+
+function getProgressColor(score) {
+  const s = Number(score) || 0
+  if (s >= 90) return '#10b981'       // 绿色
+  if (s >= 75) return '#8b5cf6'       // 紫色
+  if (s >= 60) return '#f59e0b'       // 橙色
+  return '#ef4444'                     // 红色
 }
 
 function renderCharts() {
-  const data = reportList.value
-  const reversed = [...data].reverse()
+  if (!pieChart) return
 
-  if (lineChart) {
-    const labels = reversed.map((_, i) => `第${i + 1}周`)
-    const scores = reversed.map((r) => Number(r.avgSatisfaction) || 0)
+  const pieData = satisfactionDistribution.value
+  const totalCourses = reportList.value.length
 
-    lineChart.setOption({
-      title: {
-        text: '📈 满意度趋势',
-        textStyle: { fontSize: 14, fontWeight: 600, color: '#334155' }
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        borderColor: '#e2e8f0',
-        textStyle: { color: '#334155' },
-        formatter: (params) => {
-          const item = params[0]
-          return `<strong>${item.name}</strong><br/>满意度: <span style="color:#3b82f6;font-weight:bold">${item.value}分</span>`
-        }
-      },
-      grid: { top: 50, bottom: 35, left: 55, right: 25 },
-      xAxis: {
-        type: 'category',
-        data: labels,
-        axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: { color: '#64748b', fontSize: 12 }
-      },
-      yAxis: {
-        type: 'value',
-        min: 60,
-        max: 100,
-        axisLine: { show: false },
-        splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
-        axisLabel: { color: '#94a3b8', formatter: '{value}分' }
-      },
-      series: [
-        {
-          type: 'line',
-          data: scores,
-          smooth: 0.4,
-          symbol: 'circle',
-          symbolSize: 8,
-          lineStyle: { color: '#3b82f6', width: 3 },
-          itemStyle: { color: '#3b82f6', borderColor: '#fff', borderWidth: 2 },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(59,130,246,0.4)' },
-              { offset: 1, color: 'rgba(59,130,246,0.05)' }
-            ])
-          }
-        }
+  if (!pieData.length) {
+    pieChart.setOption({
+      title: [
+        { text: '📊 课程满意度分布', left: 0, top: 0, textStyle: { fontSize: 14, fontWeight: 600, color: '#334155' } },
+        { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#94a3b8', fontSize: 14 } }
       ]
     })
+    return
   }
 
-  if (areaChartInstance) {
-    const courses = reversed.map((r) => r.courseName?.substring(0, 4) || '')
-    const scores = reversed.map((r) => Number(r.avgSatisfaction) || 0)
+  // 图例 formatter：显示名称 + 数量 + 百分比
+  const legendFormatter = (name) => {
+    const item = pieData.find((t) => `${t.label} (${t.range[0]}-${t.range[1] === 101 ? '100' : t.range[1] - 1}分)` === name)
+    if (!item) return name
+    const pct = totalCourses ? ((item.value / totalCourses) * 100).toFixed(0) : 0
+    return `{name|${item.label}}  {num|${item.value}门}  {pct|${pct}%}`
+  }
 
-    areaChartInstance.setOption({
-      title: {
-        text: '💫 各科目评分',
+  pieChart.setOption({
+    // ── 标题：顶部 + 中心数据 ──
+    title: [
+      {
+        text: '📊 课程满意度分布',
+        left: 0,
+        top: 0,
         textStyle: { fontSize: 14, fontWeight: 600, color: '#334155' }
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        borderColor: '#e2e8f0',
-        textStyle: { color: '#334155' }
-      },
-      grid: { top: 50, bottom: 35, left: 55, right: 25 },
-      xAxis: {
-        type: 'category',
-        data: courses,
-        axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: { color: '#64748b', fontSize: 11, rotate: 15 }
-      },
-      yAxis: {
-        type: 'value',
-        min: 60,
-        max: 100,
-        axisLine: { show: false },
-        splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
-        axisLabel: { color: '#94a3b8' }
-      },
-      series: [
-        {
-          type: 'line',
-          data: scores,
-          smooth: 0.5,
-          symbol: 'circle',
-          symbolSize: 8,
-          lineStyle: { color: '#8b5cf6', width: 3 },
-          itemStyle: { color: '#8b5cf6', borderColor: '#fff', borderWidth: 2 },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(139,92,246,0.35)' },
-              { offset: 1, color: 'rgba(139,92,246,0.05)' }
-            ])
-          }
+      }
+    ],
+
+    // ── 中心文字（与环形图 center: ['38%', '50%'] 对齐） ──
+    graphic: [
+      {
+        type: 'text',
+        left: '38%',
+        top: '42%',
+        style: {
+          text: '总计',
+          textAlign: 'center',
+          fill: '#94a3b8',
+          fontSize: 12,
+          fontWeight: 500
         }
-      ]
-    })
-  }
+      },
+      {
+        type: 'text',
+        left: '38%',
+        top: '50%',
+        style: {
+          text: `${totalCourses} 门`,
+          textAlign: 'center',
+          fill: '#1e293b',
+          fontSize: 22,
+          fontWeight: 700
+        }
+      }
+    ],
+
+    // ── 提示框 ──
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e2e8f0',
+      textStyle: { color: '#334155' },
+      formatter: (params) =>
+        `<strong>${params.name}</strong><br/>课程数: <span style="font-weight:bold;color:${params.color}">${params.value} 门</span><br/>占比: <span style="font-weight:bold">${params.percent}%</span>`
+    },
+
+    // ── 图例：右侧垂直排列 ──
+    legend: {
+      orient: 'vertical',
+      right: '5%',
+      top: 'center',
+      itemWidth: 8,
+      itemHeight: 8,
+      itemGap: 12,
+      textStyle: {
+        color: '#64748b',
+        fontSize: 11,
+        rich: {
+          name: { width: 36, align: 'left', color: '#475569', fontSize: 11 },
+          num: { width: 28, align: 'right', color: '#1e293b', fontWeight: 600, fontSize: 11 },
+          pct: { width: 26, align: 'right', color: '#8b5cf6', fontWeight: 600, fontSize: 11 }
+        }
+      },
+      formatter: legendFormatter
+    },
+
+    // ── 环形图 ──
+    series: [
+      {
+        type: 'pie',
+        radius: ['55%', '70%'],
+        center: ['38%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 8,
+          borderColor: '#fff',
+          borderWidth: 2
+        },
+        label: { show: false },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+            formatter: '{b}\n{d}%'
+          },
+          scaleSize: 6
+        },
+        data: pieData.map((t) => ({
+          name: `${t.label} (${t.range[0]}-${t.range[1] === 101 ? '100' : t.range[1] - 1}分)`,
+          value: t.value,
+          itemStyle: { color: t.color }
+        }))
+      }
+    ]
+  })
 }
 
 function handleResize() {
-  lineChart?.resize()
-  areaChartInstance?.resize()
+  pieChart?.resize()
 }
 
 // ========== 加载列表 ==========
@@ -203,8 +252,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  lineChart?.dispose()
-  areaChartInstance?.dispose()
+  pieChart?.dispose()
   window.removeEventListener('resize', handleResize)
 })
 
@@ -378,7 +426,7 @@ async function handleBatchAiDiagnose() {
     <!-- 图表区 -->
     <div class="chart-row">
       <div class="page-card chart-card">
-        <div ref="lineChartRef" class="chart-container"></div>
+        <div ref="pieChartRef" class="chart-container pie-chart"></div>
       </div>
 
       <div class="page-card chart-card ai-card">
@@ -410,7 +458,30 @@ async function handleBatchAiDiagnose() {
         </template>
         <el-empty v-else description="暂无AI诊断数据" :image-size="80" />
 
-        <div ref="areaChartRef" class="chart-container"></div>
+        <!-- 各科目评分排行 -->
+        <div class="subject-ranking">
+          <h4 class="ranking-title">💫 各科目评分</h4>
+          <div class="ranking-list" v-if="sortedSubjectData.length">
+            <div
+              v-for="(item, idx) in sortedSubjectData"
+              :key="item.id"
+              class="ranking-item"
+              :title="item.courseName"
+            >
+              <span class="ranking-index" :class="{ 'top3': idx < 3 }">{{ idx + 1 }}</span>
+              <span class="ranking-name">{{ item.courseName }}</span>
+              <span class="ranking-score">{{ Number(item.avgSatisfaction) || 0 }}分</span>
+              <el-progress
+                class="ranking-bar"
+                :percentage="Number(item.avgSatisfaction) || 0"
+                :show-text="false"
+                :stroke-width="8"
+                :color="getProgressColor(item.avgSatisfaction)"
+              />
+            </div>
+          </div>
+          <el-empty v-else description="暂无科目数据" :image-size="60" />
+        </div>
       </div>
     </div>
 
@@ -676,6 +747,10 @@ async function handleBatchAiDiagnose() {
   height: 240px;
 }
 
+.pie-chart {
+  height: 280px;
+}
+
 .card-title {
   font-size: 16px;
   font-weight: 600;
@@ -916,5 +991,101 @@ async function handleBatchAiDiagnose() {
 
 :deep(.ai-dialog .el-dialog__headerbtn .el-dialog__close) {
   color: #fff;
+}
+
+/* ========== 科目评分排行 ========== */
+.subject-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ranking-title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ranking-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.ranking-item:hover {
+  background: #f8fafc;
+}
+
+.ranking-index {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.ranking-index.top3 {
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+}
+
+.ranking-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ranking-score {
+  flex-shrink: 0;
+  width: 44px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.ranking-bar {
+  flex-shrink: 0;
+  width: 80px;
+}
+
+/* ========== 滚动条美化 ========== */
+.ranking-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ranking-list::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.ranking-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+}
+
+.ranking-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
 }
 </style>
